@@ -1,0 +1,15 @@
+{
+  "lastSyncTimestamp": "2026-10-14 12:58:49",
+  "lastSyncDisplay": "14 Oct 2026, 12:58 PM",
+  "totalOrders": 251,
+  "activeOpenOrders": 62,
+  "totalOpenUnits": 677298.0,
+  "totalBOMComponents": 1079,
+  "totalRawMaterials": 171,
+  "commonMaterialsCount": 105,
+  "individualMaterialsCount": 66,
+  "materialsWithStock": 115,
+  "bothDomesticImportedCount": 4,
+  "domesticOnlyCount": 106,
+  "importedOnlyCount": 5
+}

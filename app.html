@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Stock Netting & MRP Material Controller</title>
+  <link rel="icon" type="image/x-icon" href="app_icon.ico">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      
+      --green-bg: #ecfdf5;
+      --green-text: #065f46;
+      --green-border: #a7f3d0;
+      
+      --yellow-bg: #fffbeb;
+      --yellow-text: #92400e;
+      --yellow-border: #fde68a;
+      
+      --red-bg: #fef2f2;
+      --red-text: #991b1b;
+      --red-border: #fecaca;
+
+      --blue-bg: #eff6ff;
+      --blue-text: #1e40af;
+      --blue-border: #bfdbfe;
+
+      --bobbin-bg: #fef3c7; --bobbin-color: #92400e;
+      --core-bg: #e0e7ff; --core-color: #3730a3;
+      --wire-bg: #fed7aa; --wire-color: #9a3412;
+      --tape-bg: #fce7f3; --tape-color: #9d174d;
+      --sleeve-bg: #e0f2fe; --sleeve-color: #0369a1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 18px 24px; line-height: 1.45; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; background: var(--surface); padding: 16px 20px;
+      border-radius: 10px; border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .brand-box { display: flex; align-items: center; gap: 14px; }
+    .brand-icon {
+      width: 44px; height: 44px; background: #eff6ff; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; border: 1px solid #dbeafe;
+    }
+    header h1 { font-size: 19px; font-weight: 800; color: #1e293b; letter-spacing: -0.3px; }
+    header p { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .sync-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+      background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px;
+      font-size: 11.5px; font-weight: 700; color: #065f46;
+    }
+
+    .btn {
+      padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: none;
+      transition: all 0.15s ease;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-light { background: #fff; color: #334155; border: 1px solid var(--border-dark); }
+    .btn-light:hover { background: #f8fafc; border-color: #94a3b8; }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-success:hover { background: #047857; }
+
+    /* Filter & Search Bar */
+    .filter-bar {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 16px;
+      align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .filter-group { display: flex; align-items: center; gap: 8px; }
+    .filter-label { font-size: 12.5px; font-weight: 700; color: #475569; }
+    .filter-select, .search-input {
+      padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-dark);
+      font-size: 13px; background: #fff; color: var(--text); outline: none;
+    }
+    .filter-select:focus, .search-input:focus { border-color: var(--primary); }
+    .search-input { width: 220px; }
+
+    /* KPI Cards */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpi-card {
+      background: var(--surface); padding: 12px 16px; border-radius: 8px;
+      border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .kpi-card.blue { border-left: 4px solid var(--primary); }
+    .kpi-card.green { border-left: 4px solid #10b981; }
+    .kpi-card.red { border-left: 4px solid #ef4444; }
+    .kpi-card.yellow { border-left: 4px solid #f59e0b; }
+    .kpi-card.purple { border-left: 4px solid #8b5cf6; }
+    .kpi-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+    .kpi-value { font-size: 20px; font-weight: 800; color: #1e293b; margin-top: 3px; display: block; }
+    .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+    .tab {
+      padding: 9px 15px; border-radius: 7px 7px 0 0; font-size: 13px; font-weight: 700;
+      cursor: pointer; background: #f1f5f9; border: 1px solid transparent; color: #475569;
+      transition: all 0.15s ease;
+    }
+    .tab:hover { background: #e2e8f0; color: #1e293b; }
+    .tab.active { background: var(--surface); border: 1px solid var(--border); border-bottom: 2px solid var(--primary); color: var(--primary); }
+
+    /* Sub-tabs / Filter Pills inside views */
+    .sub-pills { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+    .sub-pill {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      cursor: pointer; background: #f1f5f9; border: 1px solid var(--border); color: #475569;
+    }
+    .sub-pill.active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+    /* Tables */
+    .view-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 18px;
+    }
+    .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    .view-title { font-size: 14.5px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 10px; }
+    .pill { font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #f1f5f9; color: #475569; }
+
+    .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .table-responsive::-webkit-scrollbar {
+      height: 12px;
+      width: 12px;
+    }
+    .table-responsive::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 6px;
+    }
+    .table-responsive::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 6px;
+      border: 2px solid #f1f5f9;
+    }
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+    table {
+      width: 100%;
+      min-width: 1200px;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    th {
+      background: #f8fafc; color: #475569; font-weight: 700; padding: 10px 12px;
+      border-bottom: 2px solid var(--border); white-space: nowrap; font-size: 11.5px; text-transform: uppercase;
+      position: sticky; top: 0; z-index: 10;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background-color: #f8fafc; }
+
+    .table-input {
+      width: 80px; padding: 4px 6px; border: 1.5px solid var(--border-dark); border-radius: 5px;
+      font-size: 12.5px; font-weight: 600; text-align: right; background: #fff;
+    }
+    .table-input:focus { border-color: var(--primary); outline: none; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+      border-radius: 5px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .badge-green { background: var(--green-bg); color: var(--green-text); border: 1px solid var(--green-border); }
+    .badge-yellow { background: var(--yellow-bg); color: var(--yellow-text); border: 1px solid var(--yellow-border); }
+    .badge-red { background: var(--red-bg); color: var(--red-text); border: 1px solid var(--red-border); }
+    .badge-blue { background: var(--blue-bg); color: var(--blue-text); border: 1px solid var(--blue-border); }
+
+    .cat-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+    .cat-bobbin { background: var(--bobbin-bg); color: var(--bobbin-color); }
+    .cat-core { background: var(--core-bg); color: var(--core-color); }
+    .cat-wire { background: var(--wire-bg); color: var(--wire-color); }
+    .cat-tape { background: var(--tape-bg); color: var(--tape-color); }
+    .cat-sleeve { background: #e0f2fe; color: #0369a1; }
+    .cat-other { background: #f1f5f9; color: #475569; }
+
+    .tag-common { background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .tag-indiv { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 10.5px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+
+    .part-card-highlight {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+      padding: 14px 18px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px;
+    }
+
+    /* Compact High-Density Easy View */
+    body.compact-mode table th { padding: 6px 9px; font-size: 11px; }
+    body.compact-mode table td { padding: 4.5px 9px; font-size: 11.5px; }
+    body.compact-mode .kpi-card { padding: 9px 12px; }
+    body.compact-mode .kpi-value { font-size: 19px; }
+    body.compact-mode .view-card { padding: 10px 14px; }
+    body.compact-mode .badge { padding: 1.5px 5px; font-size: 10px; }
+  </style>
+</head>
+<body class="compact-mode">
+
+  <!-- Top Bar -->
+  <header>
+    <div class="brand-box">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Production Netting & MRP Material Controller</h1>
+        <p>Verified with <strong>Bom Helper (19.03.2026)</strong> [F2 Dropdown], Open Orders [Col AE] &amp; <strong>Dual Domestic (D) / Imported (I) Live Stocks</strong></p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="sync-badge" id="sync-badge-display">🟢 Live Synced: 14 Oct 2026, 10:41 AM</div>
+      <button class="btn btn-light" onclick="toggleCompactModeApp()" id="btn-compact-app">⚡ Compact View: ON</button>
+      <button class="btn btn-light" onclick="reloadDailyData()">🔄 Re-Sync Sheets</button>
+      <button class="btn btn-success" onclick="exportProcurementPlanCSV()">📥 Export PO List (CSV)</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print Report</button>
+    </div>
+  </header>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">🔍 Bom Helper (F2 Dropdown) Part Selector:</span>
+      <select id="part-dropdown" class="filter-select" onchange="onPartDropdownSelect(this.value)">
+        <option value="">-- All 251 Part Numbers --</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Quick Search:</span>
+      <input type="text" id="part-search" class="search-input" placeholder="Part No, Customer, or Desc..." oninput="onSearchInput(this.value)">
+    </div>
+
+    <div class="filter-group">
+      <label style="font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+        <input type="checkbox" id="filter-open-only" checked onchange="toggleFilterOpenOnly()">
+        Only Active Orders with Production Demand (Col AE > 0)
+      </label>
+    </div>
+  </div>
+
+  <!-- KPI Metrics -->
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <span class="kpi-label">Total Production Demand</span>
+      <span class="kpi-value" id="kpi-open-orders">0</span>
+      <span class="kpi-sub">From Open Orders (Col AE)</span>
+    </div>
+    <div class="kpi-card blue">
+      <span class="kpi-label">Net Production Needed</span>
+      <span class="kpi-value" id="kpi-net-fg">0</span>
+      <span class="kpi-sub">Units to Manufacture</span>
+    </div>
+    <div class="kpi-card green">
+      <span class="kpi-label">Production Feasible Orders</span>
+      <span class="kpi-value" id="kpi-buildable-orders">0</span>
+      <span class="kpi-sub">100% RM stock available to produce</span>
+    </div>
+    <div class="kpi-card red">
+      <span class="kpi-label">Orders Blocked by Shortage</span>
+      <span class="kpi-value" id="kpi-shortage-orders">0</span>
+      <span class="kpi-sub">Missing required BOM raw materials</span>
+    </div>
+    <div class="kpi-card purple">
+      <span class="kpi-label">Shared Common RM Count</span>
+      <span class="kpi-value" id="kpi-common-count">91</span>
+      <span class="kpi-sub">Common materials used across >1 model</span>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('tab-fg')">1. 📊 FG Netting & Production Feasibility</button>
+    <button class="tab" onclick="showTab('tab-part-shortage')">2. 📦 Part No Wise Material Shortage List</button>
+    <button class="tab" onclick="showTab('tab-rm')">3. 🌐 Common vs Individual Material Balances</button>
+    <button class="tab" onclick="showTab('tab-bom')">4. 📑 BOM Component Breakdown (Master BOM)</button>
+    <button class="tab" onclick="showTab('tab-action')">5. 🚨 How to Place New Orders (PO Action Plan)</button>
+  </div>
+
+  <!-- TAB 1: FG Netting & Production Feasibility -->
+  <div id="tab-fg" class="view-panel">
+    <div class="view-card">
+      <div class="view-header">
+        <div class="view-title">
+          <span>FG Stock Netting &amp; Line Feasibility Table</span>
+          <span class="pill">Max Buildable = MIN( Available Store Stock / Component BOM Ratio )</span>
+        </div>
+        <span id="fg-display-count" style="font-size: 12.5px; color: var(--text-muted); font-weight: 600;"></span>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Tally FG Part Number</th>
+              <th>Customer Name</th>
+              <th>Item Code</th>
+              <th>Description / Model</th>
+              <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13.5px;">Current Open Order Qty (Col AE)</th>
+              <th style="text-align: right; background: #f8fafc; font-weight: 800; font-size: 13.5px;">Max Units Buildable</th>
+              <th>Production Feasibility Status</th>
+              <th>Shortage Component Alert / Bottleneck</th>
+            </tr>
+          </thead>
+          <tbody id="fg-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Part No Wise Material Shortage List -->
+  <div id="tab-part-shortage" class="view-panel" style="display: none;">
+    <div class="view-card">
+      <div class="view-header" style="flex-wrap: wrap; gap: 12px;">
+        <div class="view-title">
+          <span>📦 Individual Part No Stock Availability &amp; Shortage Material Register</span>
+          <span class="pill">All 62 Production Demand Parts ➔ Exact BOM Materials ➔ Usable Store Stocks ➔ Shortage Items</span>
+        </div>
+        
+        <!-- Tab 2 View Mode Switcher -->
+        <div class="sub-pills" style="margin-bottom: 0;">
+          <button class="sub-pill active" id="tab2-mode-all" onclick="switchTab2View('ALL')">📋 All Parts Register (62 Parts)</button>
+          <button class="sub-pill" id="tab2-mode-single" onclick="switchTab2View('SINGLE')">🔍 Single Part Deep-Dive (F2 Dropdown)</button>
+        </div>
+      </div>
+
+      <!-- VIEW 1: All Parts Stock Availability & Shortage Register -->
+      <div id="tab2-view-all">
+        <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; padding: 10px 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: #1e40af; flex-wrap: wrap;">
+          <span><strong>1. Production Demand:</strong> Part No &amp; Demand Qty (Col AE)</span>
+          <span style="color: #94a3b8;">➔</span>
+          <span><strong>2. Master BOM (19.03.2026):</strong> Required Raw Material List &amp; Ratios</span>
+          <span style="color: #94a3b8;">➔</span>
+          <span><strong>3. Stores Stock (`Stocks` Sheet):</strong> Check Domestic (D) &amp; Imported (I) Stock</span>
+          <span style="color: #94a3b8;">➔</span>
+          <span><strong>4. Status:</strong> Production Feasible (RM 100% in Stock) vs. Material Shortage</span>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Filter Status:</span>
+            <button class="sub-pill active" id="filter-all-parts" onclick="filterPartRegister('ALL')">All Active Orders (62)</button>
+            <button class="sub-pill" id="filter-shortage-parts" onclick="filterPartRegister('SHORTAGE')">🔴 Material Shortage (45)</button>
+            <button class="sub-pill" id="filter-ready-parts" onclick="filterPartRegister('READY')">🟢 Production Feasible (17)</button>
+          </div>
+          <button class="btn btn-light" onclick="exportPartShortageRegisterCSV()">
+            📥 Export Part Shortage Summary CSV
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Tally Part Number</th>
+                <th>Customer</th>
+                <th>Item Code</th>
+                <th>Description / Model</th>
+                <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13.5px;">Demand Qty (Col AE)</th>
+                <th style="text-align: right; font-weight: 800; font-size: 13.5px;">Can Build (Units)</th>
+                <th>Production Feasibility Status</th>
+                <th style="min-width: 320px;">Shortage Raw Materials Details (BOM Code / Available / Deficit)</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="all-parts-register-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Single Part F2 Dropdown Deep-Dive -->
+      <div id="tab2-view-single" style="display: none;">
+        <!-- Selected Part Highlight Card (F2 Dropdown Dynamic Selector) -->
+        <div id="part-summary-card" class="part-card-highlight">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span style="font-size: 11.5px; font-weight: 800; color: #1e40af; text-transform: uppercase; background: #dbeafe; padding: 2px 8px; border-radius: 4px;">Bom Helper F2 Dropdown Part:</span>
+              <select id="tab2-part-select" class="filter-select" style="font-weight: 700; min-width: 280px;" onchange="onTab2PartSelect(this.value)">
+                <option value="">-- Choose Part from F2 Dropdown List --</option>
+              </select>
+            </div>
+            <div style="font-size: 17px; font-weight: 800; color: #0f172a; margin-top: 2px;" id="part-card-title">Select a Part Number to view Verified Material List</div>
+            <div style="font-size: 12.5px; color: #475569;" id="part-card-desc">Matches open order part no, pulls exact Master BOM material list, and checks against Live Stocks.</div>
+          </div>
+          <div style="display: flex; gap: 14px; align-items: center;" id="part-card-stats"></div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Component Status</th>
+                <th>Category</th>
+                <th>BOM Component</th>
+                <th>Material Specification</th>
+                <th style="background: #f0fdf4; border-bottom: 2px solid #86efac;">Domestic (D-Series)<br><span style="font-size: 11px; font-weight: 400; color: #166534;">RM Part No &amp; Live Stock</span></th>
+                <th style="background: #f0f9ff; border-bottom: 2px solid #7dd3fc;">Imported (I-Series)<br><span style="font-size: 11px; font-weight: 400; color: #0369a1;">RM Part No &amp; Live Stock</span></th>
+                <th style="text-align: right; background: #fefce8; color: #854d0e; font-weight: 800; border-bottom: 2px solid #fde047;">Considered Stock<br><span style="font-size: 10.5px; font-weight: 400;">(Which is Available)</span></th>
+                <th style="text-align: right;">BOM Ratio</th>
+                <th style="text-align: right; color: #1e40af; font-weight: 700;">Production Demand Qty</th>
+                <th style="text-align: right; background: #fef2f2; color: #b91c1c; font-weight: 800;">Balance / Shortage</th>
+                <th style="text-align: right;">Max Buildable Units</th>
+                <th>Bottleneck Alert</th>
+              </tr>
+            </thead>
+            <tbody id="part-shortage-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAB 3: Common vs Individual Material Balances -->
+  <div id="tab-rm"  class="view-panel" style="display: none;">
+    <div class="view-card">
+      <div class="view-header">
+        <div class="view-title">
+          <span>🌐 Cumulative Raw Material Balances &amp; Commonality Breakdown</span>
+          <span class="pill">Roll-up across all 251 FG Parts &amp; 62 Open Orders</span>
+        </div>
+      </div>
+
+      <!-- Sub Pills Filter -->
+      <div class="sub-pills">
+        <button class="sub-pill active" id="pill-all" onclick="filterRMType('ALL')">All Raw Materials (162)</button>
+        <button class="sub-pill" id="pill-common" onclick="filterRMType('COMMON')">🌐 Common Shared Materials (91)</button>
+        <button class="sub-pill" id="pill-indiv" onclick="filterRMType('INDIVIDUAL')">📌 Individual Dedicated Materials (71)</button>
+        <button class="sub-pill" id="pill-shortage" onclick="filterRMType('SHORTAGE')">🚨 Shortage Only (Deficit > 0)</button>
+      </div>
+
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>RM Part Number</th>
+              <th>Material Description</th>
+              <th>Category</th>
+              <th>Usage</th>
+              <th>Domestic (D) In Stock</th>
+              <th>Imported (I) In Stock</th>
+              <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800;">Total Usable Stock</th>
+              <th style="text-align: right; color: #b91c1c;">BOM Gross Demand</th>
+              <th style="text-align: right;">Projected Balance</th>
+              <th style="text-align: right; background: #fef2f2; color: #b91c1c; font-weight: 800;">Deficit Need</th>
+              <th style="text-align: right;">Unit Rate (₹)</th>
+              <th style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 800;">Suggested Order (MOQ)</th>
+              <th style="text-align: right; color: #15803d; font-weight: 700;">Est. PO Value (₹)</th>
+              <th>Manual Safety Override</th>
+            </tr>
+          </thead>
+          <tbody id="rm-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: BOM Component Helper -->
+  <div id="tab-bom" class="view-panel" style="display: none;">
+    <div class="view-card">
+      <div class="view-header">
+        <div class="view-title">
+          <span>📑 Master BOM Component Matrix (19.03.2026)</span>
+          <span class="pill">Exact engineering component ratios per FG unit</span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>FG Part Number</th>
+              <th>Customer</th>
+              <th>Category</th>
+              <th>Raw Material Part No</th>
+              <th>Material Description</th>
+              <th style="text-align: right;">BOM Ratio / Unit FG</th>
+              <th style="text-align: right;">Open Order Net FG</th>
+              <th style="text-align: right; font-weight: 800; color: #1d4ed8; background: #eff6ff;">Total RM Required</th>
+              <th>BOM Source Verification</th>
+            </tr>
+          </thead>
+          <tbody id="bom-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: How to Place New Orders (PO Action Plan) -->
+  <div id="tab-action" class="view-panel" style="display: none;">
+    <div class="view-card">
+      <div class="view-header">
+        <div class="view-title" style="color: #b91c1c;">
+          <span>🚨 How to Place New Orders — Procurement PO Action Plan</span>
+          <span class="pill" id="po-summary-pill" style="background: #fef2f2; color: #b91c1c; font-weight: 700;"></span>
+        </div>
+        <button class="btn btn-success" onclick="exportProcurementPlanCSV()">📥 Export PO List to CSV</button>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>PO Priority</th>
+              <th>RM Part Number</th>
+              <th>Material Description</th>
+              <th>Category</th>
+              <th>Store Matched Spec</th>
+              <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800;">Actual Stock</th>
+              <th style="text-align: right; color: #b91c1c;">BOM Open Demand</th>
+              <th style="text-align: right;">Net Shortage</th>
+              <th style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 13.5px;">Recommended PO Qty (MOQ)</th>
+              <th style="text-align: right;">Rate (₹)</th>
+              <th style="text-align: right; color: #15803d; font-weight: 700;">Est. Cost (₹)</th>
+              <th>Procurement Order Placement Action</th>
+            </tr>
+          </thead>
+          <tbody id="action-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Embedded Complete Dataset loaded from Google Sheet -->
+  <script src="open_orders_data.js?v=20261014_1300"></script>
+  <script src="bom_data.js?v=20261014_1300"></script>
+  <script src="rm_data.js?v=20261014_1300"></script>
+  <script src="sync_status.js?v=20261014_1300"></script>
+
+  <script>
+    const APP_VERSION = "2026-10-14-FEASIBILITY-PRODUCTION-READY-V14";
+    if (localStorage.getItem("MFG_VERSION") !== APP_VERSION) {
+      localStorage.removeItem("MFG_FG_STATE");
+      localStorage.removeItem("MFG_RM_DATA");
+      localStorage.setItem("MFG_VERSION", APP_VERSION);
+    }
+
+    if (window.mrpSyncStatus && window.mrpSyncStatus.lastSyncDisplay) {
+      const badge = document.getElementById("sync-badge-display");
+      if (badge) badge.innerText = `🟢 Live Synced: ${window.mrpSyncStatus.lastSyncDisplay}`;
+    }
+
+    let savedStateMap = JSON.parse(localStorage.getItem("MFG_FG_STATE")) || {};
+    let fgParts = (window.rawOpenOrdersData || []).map((item, idx) => {
+      const uid = `${item.partNo}__${item.customer || ''}__${idx}`;
+      let fgStock = item.fgStock || 0;
+      let wipStock = item.wipStock || 0;
+      if (savedStateMap[uid]) {
+        fgStock = savedStateMap[uid].fgStock !== undefined ? savedStateMap[uid].fgStock : fgStock;
+        wipStock = savedStateMap[uid].wipStock !== undefined ? savedStateMap[uid].wipStock : wipStock;
+      }
+      return { ...item, uniqueId: uid, fgStock, wipStock };
+    });
+
+    let bomData = window.rawMasterBOMData || window.rawBOMData || [];
+    let rmInventory = JSON.parse(localStorage.getItem("MFG_RM_DATA")) || window.rawRMData || [];
+
+    let selectedFilterPart = "";
+    let searchFilter = "";
+    let showOpenOnly = true;
+    let currentRMFilterType = "ALL";
+
+    function saveState() {
+      const stateMap = {};
+      fgParts.forEach(fg => {
+        stateMap[fg.uniqueId] = { fgStock: fg.fgStock, wipStock: fg.wipStock };
+      });
+      localStorage.setItem("MFG_FG_STATE", JSON.stringify(stateMap));
+      localStorage.setItem("MFG_RM_DATA", JSON.stringify(rmInventory));
+      runCalculations();
+    }
+
+    function getCatClass(cat) {
+      const c = (cat || "").toLowerCase();
+      if (c.includes("bobbin")) return "cat-bobbin";
+      if (c.includes("core")) return "cat-core";
+      if (c.includes("wire")) return "cat-wire";
+      if (c.includes("tape")) return "cat-tape";
+      if (c.includes("sleeve")) return "cat-sleeve";
+      return "cat-other";
+    }
+
+    function populatePartDropdown() {
+      const dropdown = document.getElementById("part-dropdown");
+      dropdown.innerHTML = `<option value="">-- Choose Part (All 62 Active Orders) --</option>`;
+
+      const uniquePartMap = new Map();
+      fgParts.forEach(p => {
+        if (!uniquePartMap.has(p.partNo)) {
+          uniquePartMap.set(p.partNo, { ...p, totalOpen: p.openQty });
+        } else {
+          const ex = uniquePartMap.get(p.partNo);
+          ex.totalOpen = (ex.totalOpen || 0) + p.openQty;
+        }
+      });
+
+      const allParts = Array.from(uniquePartMap.values()).sort((a,b) => a.partNo.localeCompare(b.partNo));
+      const activeParts = allParts.filter(p => p.totalOpen > 0);
+      const inactiveParts = allParts.filter(p => !p.totalOpen || p.totalOpen <= 0);
+
+      const tab2Dropdown = document.getElementById("tab2-part-select");
+      if (tab2Dropdown) tab2Dropdown.innerHTML = `<option value="">-- Choose Part from F2 Dropdown List --</option>`;
+
+      const grpActive1 = document.createElement("optgroup");
+      grpActive1.label = `⚡ Active Production Orders (${activeParts.length} Parts)`;
+      const grpActive2 = document.createElement("optgroup");
+      grpActive2.label = `⚡ Active Production Orders (${activeParts.length} Parts)`;
+
+      activeParts.forEach(p => {
+        const itemCodeStr = p.itemCode ? ` | ${p.itemCode}` : "";
+        const demandStr = ` [Demand: ${Math.round(p.totalOpen).toLocaleString()}]`;
+        const text = `${p.partNo}${itemCodeStr} — ${p.customer || 'Customer'} (${p.desc || ''})${demandStr}`;
+
+        const opt = document.createElement("option");
+        opt.value = p.partNo;
+        opt.text = text;
+        grpActive1.appendChild(opt);
+
+        if (tab2Dropdown) {
+          const opt2 = document.createElement("option");
+          opt2.value = p.partNo;
+          opt2.text = text;
+          grpActive2.appendChild(opt2);
+        }
+      });
+
+      dropdown.appendChild(grpActive1);
+      if (tab2Dropdown) tab2Dropdown.appendChild(grpActive2);
+
+      const grpOther1 = document.createElement("optgroup");
+      grpOther1.label = `📋 Other Master BOM Parts (Zero Demand - ${inactiveParts.length} Parts)`;
+      const grpOther2 = document.createElement("optgroup");
+      grpOther2.label = `📋 Other Master BOM Parts (Zero Demand - ${inactiveParts.length} Parts)`;
+
+      inactiveParts.forEach(p => {
+        const itemCodeStr = p.itemCode ? ` | ${p.itemCode}` : "";
+        const text = `${p.partNo}${itemCodeStr} — ${p.customer || 'Customer'} (${p.desc || ''}) [No Active Demand]`;
+
+        const opt = document.createElement("option");
+        opt.value = p.partNo;
+        opt.text = text;
+        grpOther1.appendChild(opt);
+
+        if (tab2Dropdown) {
+          const opt2 = document.createElement("option");
+          opt2.value = p.partNo;
+          opt2.text = text;
+          grpOther2.appendChild(opt2);
+        }
+      });
+
+      dropdown.appendChild(grpOther1);
+      if (tab2Dropdown) tab2Dropdown.appendChild(grpOther2);
+    }
+
+    function onPartDropdownSelect(val) {
+      selectedFilterPart = val;
+      runCalculations();
+      // If user selected a specific part, also ensure Tab 2 reflects it immediately
+      const partSelectTab2 = document.getElementById("tab2-part-select");
+      if (partSelectTab2) partSelectTab2.value = val;
+    }
+
+    function onTab2PartSelect(val) {
+      selectedFilterPart = val;
+      const mainDropdown = document.getElementById("part-dropdown");
+      if (mainDropdown) mainDropdown.value = val;
+      const tab2Dropdown = document.getElementById("tab2-part-select");
+      if (tab2Dropdown) tab2Dropdown.value = val;
+      runCalculations();
+    }
+
+    function onSearchInput(val) {
+      searchFilter = (val || "").trim().toLowerCase();
+      runCalculations();
+    }
+
+    function toggleFilterOpenOnly() {
+      showOpenOnly = document.getElementById("filter-open-only").checked;
+      runCalculations();
+    }
+
+    function filterRMType(type) {
+      currentRMFilterType = type;
+      document.querySelectorAll(".sub-pill").forEach(p => p.classList.remove("active"));
+      if (type === "ALL") document.getElementById("pill-all").classList.add("active");
+      else if (type === "COMMON") document.getElementById("pill-common").classList.add("active");
+      else if (type === "INDIVIDUAL") document.getElementById("pill-indiv").classList.add("active");
+      else if (type === "SHORTAGE") document.getElementById("pill-shortage").classList.add("active");
+      runCalculations();
+    }
+
+    function showTab(tabId) {
+      document.querySelectorAll(".view-panel").forEach(p => p.style.display = "none");
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.getElementById(tabId).style.display = "block";
+      event.target.classList.add("active");
+    }
+
+    // MAIN PRODUCTION NETTING & CALCULATION ENGINE
+    function runCalculations() {
+      let totalOpenDemand = 0;
+      let totalNetRequiredFG = 0;
+      const netProductionByPart = {};
+      const stockMap = {};
+      rmInventory.forEach(r => { stockMap[r.rmPart] = Number(r.stock || 0); });
+
+      // FG Netting
+      fgParts.forEach(fg => {
+        const openQ = Number(fg.openQty || 0);
+        totalOpenDemand += openQ;
+        // Direct Open Order Demand (FG stock is currently not updated)
+        const netProduction = openQ;
+        fg.netProduction = netProduction;
+        totalNetRequiredFG += netProduction;
+        netProductionByPart[fg.partNo] = (netProductionByPart[fg.partNo] || 0) + netProduction;
+      });
+
+      // Part-Wise Feasibility & Bottleneck Analysis
+      let buildableOrdersCount = 0;
+      let shortageOrdersCount = 0;
+
+      fgParts.forEach(fg => {
+        const comps = bomData.filter(b => b.fgPart === fg.partNo);
+        if (comps.length === 0) {
+          fg.maxBuildable = 0;
+          fg.bottleneck = null;
+          fg.hasShortage = fg.netProduction > 0;
+          fg.noBOM = true;
+          fg.shortages = [];
+          fg.shortageCount = 0;
+          if (fg.openQty > 0) shortageOrdersCount++;
+          return;
+        }
+
+        let maxBuildable = Infinity;
+        let bottleneck = null;
+
+        const partShortages = [];
+        comps.forEach(c => {
+          const rmObj = rmInventory.find(r => r.rmPart === c.rmPart) || {};
+          const avail = Number(rmObj.stock !== undefined ? rmObj.stock : (stockMap[c.rmPart] || 0));
+          const ratio = Number(c.ratio) || 1;
+          const reqTotal = fg.netProduction * ratio;
+          const unitsWithRM = Math.floor(avail / ratio);
+
+          if (unitsWithRM < maxBuildable) {
+            maxBuildable = unitsWithRM;
+            bottleneck = { 
+              rmPart: c.rmPart, 
+              desc: c.rmDesc, 
+              avail, 
+              ratio, 
+              unit: c.unit, 
+              reqTotal,
+              shortage: Math.max(0, reqTotal - avail),
+              source: rmObj.stockSourceLabel || ''
+            };
+          }
+
+          if (avail < reqTotal) {
+            partShortages.push({
+              rmPart: c.rmPart,
+              desc: c.rmDesc || '',
+              category: c.category || 'Other',
+              avail: avail,
+              ratio: ratio,
+              unit: c.unit || '',
+              reqTotal: reqTotal,
+              shortage: reqTotal - avail,
+              dParts: rmObj.domesticParts || '-',
+              dStock: rmObj.domesticStock || 0,
+              iParts: rmObj.importedParts || '-',
+              iStock: rmObj.importedStock || 0,
+              source: rmObj.stockSourceLabel || 'Stockout'
+            });
+          }
+        });
+
+        fg.maxBuildable = maxBuildable === Infinity ? 0 : maxBuildable;
+        fg.bottleneck = bottleneck;
+        fg.shortages = partShortages;
+        fg.shortageCount = partShortages.length;
+        fg.hasShortage = fg.maxBuildable < fg.netProduction;
+
+        if (fg.openQty > 0) {
+          if (!fg.hasShortage) buildableOrdersCount++;
+          else shortageOrdersCount++;
+        }
+      });
+
+      document.getElementById("kpi-open-orders").innerText = Math.round(totalOpenDemand).toLocaleString();
+      document.getElementById("kpi-net-fg").innerText = Math.round(totalNetRequiredFG).toLocaleString();
+      document.getElementById("kpi-buildable-orders").innerText = buildableOrdersCount;
+      document.getElementById("kpi-shortage-orders").innerText = shortageOrdersCount;
+
+      const pAll = document.getElementById("filter-all-parts");
+      if (pAll) pAll.innerText = `All Active Orders (${buildableOrdersCount + shortageOrdersCount})`;
+      const pShort = document.getElementById("filter-shortage-parts");
+      if (pShort) pShort.innerText = `🔴 Material Shortage (${shortageOrdersCount})`;
+      const pReady = document.getElementById("filter-ready-parts");
+      if (pReady) pReady.innerText = `🟢 Production Feasible (${buildableOrdersCount})`;
+
+      // Cumulative RM Demand Aggregation
+      const rmDemand = {};
+      rmInventory.forEach(rm => { rmDemand[rm.rmPart] = 0; });
+      bomData.forEach(b => {
+        const netFG = netProductionByPart[b.fgPart] || 0;
+        rmDemand[b.rmPart] = (rmDemand[b.rmPart] || 0) + (netFG * Number(b.ratio));
+      });
+
+      // RM Inventory Calculations
+      const rmResults = rmInventory.map(rm => {
+        const grossReq = rmDemand[rm.rmPart] || 0;
+        const projectedBalance = Number(rm.stock) - grossReq;
+        const effectiveSafety = (rm.manualOverride !== null && rm.manualOverride !== "" && !isNaN(rm.manualOverride))
+          ? Number(rm.manualOverride)
+          : Number(rm.calcSafety);
+        const balanceNeedMaterial = Math.max(0, grossReq - Number(rm.stock));
+
+        let status = "GREEN_HEALTHY";
+        if (projectedBalance <= effectiveSafety) status = "RED_CRITICAL";
+        else if (projectedBalance <= Number(rm.rol)) status = "YELLOW_REORDER";
+
+        let suggestedOrder = 0;
+        if (status !== "GREEN_HEALTHY" && grossReq > 0) {
+          const shortageFromTarget = (Number(rm.rol) + effectiveSafety) - projectedBalance;
+          const moq = Number(rm.moq) || 1;
+          suggestedOrder = Math.ceil(Math.max(moq, shortageFromTarget) / moq) * moq;
+        }
+
+        const estPOValue = (suggestedOrder > 0 && rm.rate) ? Math.round(suggestedOrder * Number(rm.rate)) : 0;
+
+        return {
+          ...rm,
+          grossReq,
+          projectedBalance,
+          effectiveSafety,
+          balanceNeedMaterial,
+          status,
+          suggestedOrder,
+          estPOValue
+        };
+      });
+
+      renderFGTable(fgParts);
+      renderPartShortageTable(fgParts, stockMap);
+      renderAllPartsRegister();
+      renderRMTable(rmResults);
+      renderBOMTable(netProductionByPart, rmResults);
+      renderActionTable(rmResults.filter(r => (r.status === "RED_CRITICAL" || r.status === "YELLOW_REORDER") && r.grossReq > 0));
+    }
+
+    // Render TAB 1: FG Netting
+    function renderFGTable(list) {
+      const tbody = document.getElementById("fg-table-body");
+      let filtered = [...list];
+
+      if (selectedFilterPart) filtered = filtered.filter(item => item.partNo === selectedFilterPart);
+      if (searchFilter) {
+        filtered = filtered.filter(item => 
+          (item.partNo || "").toLowerCase().includes(searchFilter) ||
+          (item.itemCode || "").toLowerCase().includes(searchFilter) ||
+          (item.customer || "").toLowerCase().includes(searchFilter) ||
+          (item.desc || "").toLowerCase().includes(searchFilter)
+        );
+      }
+      if (showOpenOnly) filtered = filtered.filter(item => item.openQty > 0);
+
+      document.getElementById("fg-display-count").innerText = `Showing ${filtered.length} Customer Orders`;
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted); padding: 25px;">No matching part numbers found for current filter.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        let feasBadge = '';
+        let bneckStr = '';
+        if (item.netProduction <= 0) {
+          feasBadge = `<span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700;">⚪ No Production Order (0 Qty)</span>`;
+          bneckStr = `<span style="color: #94a3b8; font-size: 11.5px;">— No Active Order</span>`;
+        } else if (item.noBOM) {
+          feasBadge = `<span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 700;">⚠️ No BOM in Master Sheet</span>`;
+          bneckStr = `<span style="color: #b45309; font-size: 11.5px;">Check BOM (19.03.2026)</span>`;
+        } else if (item.hasShortage) {
+          feasBadge = `<span class="badge badge-red" style="font-weight: 700;">🔴 Material Shortage (Max ${item.maxBuildable.toLocaleString()})</span>`;
+          if (item.shortages && item.shortages.length > 0) {
+            bneckStr = `<span style="cursor: pointer; color: #b91c1c; font-weight: 700;" onclick="switchToPartDeepDive('${item.partNo}')">🔴 ${item.shortages.length} Shortage(s): <u>${item.bottleneck ? item.bottleneck.rmPart : item.shortages[0].rmPart}</u> ➔</span>`;
+          } else {
+            bneckStr = `<span style="color: #b91c1c; font-size: 11px;">⚠️ Deficit Shortage</span>`;
+          }
+        } else {
+          feasBadge = `<span class="badge badge-green" style="font-weight: 700;">🟢 Production Feasible (RM 100% in Stock)</span>`;
+          bneckStr = `<span style="color: #15803d; font-size: 11.5px; font-weight: 600;">✓ All Required RM Available in Stores</span>`;
+        }
+
+        return `
+          <tr>
+            <td><strong style="font-size: 13.5px; color: #0f172a;">${item.partNo}</strong></td>
+            <td><span style="font-weight: 600; color: #334155;">${item.customer || '-'}</span></td>
+            <td><code style="font-weight: 700; color: #0284c7; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${item.itemCode || '-'}</code></td>
+            <td><span style="color: #64748b; font-size: 12px;">${item.desc || '-'}</span></td>
+            <td style="text-align: right; font-weight: 800; font-size: 14px; background: #f0fdf4; color: #166534;">
+              ${Math.round(item.openQty).toLocaleString()}
+            </td>
+            <td style="text-align: right; font-weight: 800; font-size: 14px; color: ${item.hasShortage ? '#b91c1c' : '#15803d'};">
+              ${Math.round(item.maxBuildable).toLocaleString()}
+            </td>
+            <td>${feasBadge}</td>
+            <td>${bneckStr}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Render TAB 2: Part No Wise Material Shortage List
+    let currentTab2View = 'ALL';
+    let currentPartRegisterFilter = 'ALL';
+
+    function switchTab2View(view) {
+      currentTab2View = view;
+      document.getElementById('tab2-mode-all').classList.toggle('active', view === 'ALL');
+      document.getElementById('tab2-mode-single').classList.toggle('active', view === 'SINGLE');
+      document.getElementById('tab2-view-all').style.display = view === 'ALL' ? 'block' : 'none';
+      document.getElementById('tab2-view-single').style.display = view === 'SINGLE' ? 'block' : 'none';
+      if (view === 'ALL') {
+        renderAllPartsRegister();
+      }
+    }
+
+    function filterPartRegister(type) {
+      currentPartRegisterFilter = type;
+      document.getElementById('filter-all-parts').classList.toggle('active', type === 'ALL');
+      document.getElementById('filter-shortage-parts').classList.toggle('active', type === 'SHORTAGE');
+      document.getElementById('filter-ready-parts').classList.toggle('active', type === 'READY');
+      renderAllPartsRegister();
+    }
+
+    function switchToPartDeepDive(partNo) {
+      showTab('tab-part-shortage');
+      switchTab2View('SINGLE');
+      onTab2PartSelect(partNo);
+    }
+
+    function renderAllPartsRegister() {
+      const tbody = document.getElementById('all-parts-register-body');
+      if (!tbody) return;
+
+      let list = fgParts.filter(fg => fg.openQty > 0);
+      if (currentPartRegisterFilter === 'SHORTAGE') {
+        list = list.filter(fg => fg.hasShortage);
+      } else if (currentPartRegisterFilter === 'READY') {
+        list = list.filter(fg => !fg.hasShortage);
+      }
+
+      if (searchFilter) {
+        list = list.filter(item => 
+          (item.partNo || "").toLowerCase().includes(searchFilter) ||
+          (item.itemCode || "").toLowerCase().includes(searchFilter) ||
+          (item.customer || "").toLowerCase().includes(searchFilter) ||
+          (item.desc || "").toLowerCase().includes(searchFilter)
+        );
+      }
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #64748b; padding: 25px;">No parts match current filter.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(fg => {
+        let statusBadge = '';
+        if (fg.netProduction <= 0) {
+          statusBadge = `<span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 11.5px; font-weight: 700;">⚪ No Production Order</span>`;
+        } else if (fg.hasShortage) {
+          statusBadge = `<span class="badge badge-red" style="font-size: 11.5px; font-weight: 700;">🔴 Material Shortage (${fg.shortageCount} items)</span>`;
+        } else {
+          statusBadge = `<span class="badge badge-green" style="font-size: 11.5px; font-weight: 700;">🟢 Production Feasible (RM 100% in Stock)</span>`;
+        }
+
+        let shortageBadges = '';
+        if (fg.netProduction <= 0) {
+          shortageBadges = `<span style="color: #94a3b8; font-size: 12px;">— No active production demand for this part</span>`;
+        } else if (fg.shortages && fg.shortages.length > 0) {
+          shortageBadges = fg.shortages.map(sh => {
+            const shortStr = sh.shortage < 10 && sh.shortage % 1 !== 0 ? sh.shortage.toFixed(3) : Math.round(sh.shortage).toLocaleString();
+            const availStr = sh.avail < 10 && sh.avail % 1 !== 0 ? sh.avail.toFixed(3) : Math.round(sh.avail).toLocaleString();
+            const reqStr = sh.reqTotal < 10 && sh.reqTotal % 1 !== 0 ? sh.reqTotal.toFixed(3) : Math.round(sh.reqTotal).toLocaleString();
+            return `<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 8px; margin-bottom: 4px; font-size: 11.5px;">
+              <strong style="color: #991b1b;">${sh.rmPart}</strong> <span style="color: #475569;">(${sh.category}):</span> 
+              Need: <strong>${reqStr}</strong> | In Stock: <strong>${availStr}</strong> | <span style="color: #b91c1c; font-weight: 800;">Shortage: -${shortStr} ${sh.unit}</span>
+            </div>`;
+          }).join('');
+        } else {
+          shortageBadges = `<span style="color: #15803d; font-weight: 700; font-size: 12px;">✓ All Required BOM Materials are in Stock (Ready for Production Line)</span>`;
+        }
+
+        return `
+          <tr>
+            <td><strong style="color: #0f172a; font-size: 13.5px;">${fg.partNo}</strong></td>
+            <td><span style="font-weight: 600; color: #334155;">${fg.customer || '-'}</span></td>
+            <td><code style="font-weight: 700; color: #0284c7; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${fg.itemCode || '-'}</code></td>
+            <td><span style="color: #475569; font-size: 12px;">${fg.desc || '-'}</span></td>
+            <td style="text-align: right; background: #f0fdf4; font-weight: 800; color: #166534; font-size: 13.5px;">${Math.round(fg.openQty).toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 800; color: ${fg.hasShortage ? '#b91c1c' : '#15803d'}; font-size: 13.5px;">${fg.maxBuildable.toLocaleString()}</td>
+            <td>${statusBadge}</td>
+            <td>${shortageBadges}</td>
+            <td>
+              <button class="btn btn-light" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" onclick="switchToPartDeepDive('${fg.partNo}')">
+                Inspect BOM ➔
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportPartShortageRegisterCSV() {
+      const openParts = fgParts.filter(fg => fg.openQty > 0);
+      let csv = "Part Number,Customer,Item Code,Description,Open Qty (Col AE),FG Stock,WIP Stock,Net FG Production Needed,Max Buildable Units,Stock Status,Shortage Materials Count,Shortage Material Details\n";
+
+      openParts.forEach(fg => {
+        let status = fg.hasShortage ? "MATERIAL_SHORTAGE" : "PRODUCTION_FEASIBLE";
+        let shortDetails = "";
+        if (fg.shortages && fg.shortages.length > 0) {
+          shortDetails = fg.shortages.map(sh => `${sh.rmPart} (${sh.category}): Req ${sh.reqTotal.toFixed(2)} / Stock ${sh.avail.toFixed(2)} / Deficit ${sh.shortage.toFixed(2)} ${sh.unit}`).join(" | ");
+        } else {
+          shortDetails = "None (All materials in stock)";
+        }
+        
+        csv += `"${fg.partNo}","${fg.customer || ''}","${fg.itemCode || ''}","${(fg.desc || '').replace(/"/g, '""')}",${fg.openQty},${fg.fgStock},${fg.wipStock},${fg.netProduction},${fg.maxBuildable},"${status}",${fg.shortageCount || 0},"${shortDetails}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Part_Wise_Stock_Availability_And_Shortage_Register_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    
+    function renderPartShortageTable(list, stockMap) {
+      const tbody = document.getElementById("part-shortage-table-body");
+      const titleEl = document.getElementById("part-card-title");
+      const descEl = document.getElementById("part-card-desc");
+      const statsEl = document.getElementById("part-card-stats");
+
+      let activePart = selectedFilterPart;
+      if (!activePart) {
+        const firstActive = list.find(o => o.openQty > 0);
+        activePart = firstActive ? firstActive.partNo : (list[0] ? list[0].partNo : "");
+      }
+
+      const fg = list.find(o => o.partNo === activePart);
+      if (!fg) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 25px;">Please select a part number.</td></tr>`;
+        return;
+      }
+
+      titleEl.innerText = `${fg.partNo} — ${fg.customer || ''} [Item Code: ${fg.itemCode || ''}]`;
+      descEl.innerText = `${fg.desc || ''} | Production Demand (Col AE): ${Math.round(fg.openQty).toLocaleString()} units`;
+
+      let cardBadge = '';
+      if (!fg.openQty || fg.openQty <= 0) {
+        cardBadge = `<div class="badge" style="font-size: 13px; padding: 6px 12px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700;">⚪ No Active Production Order (Open Demand = 0)</div>`;
+      } else if (fg.hasShortage) {
+        cardBadge = `<div class="badge badge-red" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🔴 Deficit Shortage (Can only build ${fg.maxBuildable.toLocaleString()} of ${fg.netProduction.toLocaleString()} Units)</div>`;
+      } else {
+        cardBadge = `<div class="badge badge-green" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🟢 Production Feasible: All Raw Materials in Stock (Ready to Build Full Demand: ${fg.netProduction.toLocaleString()} Units)</div>`;
+      }
+
+      statsEl.innerHTML = cardBadge;
+
+      const comps = bomData.filter(b => b.fgPart === fg.partNo);
+      if (comps.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 25px; color: #64748b;">No BOM component matrix found for this model.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = comps.map(c => {
+        const ratio = Number(c.ratio) || 1;
+        const reqQty = fg.netProduction * ratio;
+        const rmObj = rmInventory.find(r => r.rmPart === c.rmPart) || {};
+        const avail = Number(rmObj.stock !== undefined ? rmObj.stock : (stockMap[c.rmPart] || 0));
+        const dStock = Number(rmObj.domesticStock || 0);
+        const iStock = Number(rmObj.importedStock || 0);
+        const dParts = rmObj.domesticParts || "-";
+        const iParts = rmObj.importedParts || "-";
+        const sourceType = rmObj.stockSourceType || "STOCKOUT";
+
+        const shortage = Math.max(0, reqQty - avail);
+        const surplus = Math.max(0, avail - reqQty);
+        const maxUnitsWithThis = Math.floor(avail / ratio);
+        const isBottleneck = fg.bottleneck && fg.bottleneck.rmPart === c.rmPart && fg.hasShortage;
+
+        const statusTag = shortage > 0
+          ? `<span class="badge badge-red" style="font-weight: 800; font-size: 11px; padding: 4px 8px;">🔴 NOT AVAILABLE</span>`
+          : `<span class="badge badge-green" style="font-weight: 800; font-size: 11px; padding: 4px 8px;">🟢 AVAILABLE</span>`;
+
+        const bneckAlert = isBottleneck
+          ? `<span class="badge badge-red" style="font-size: 10.5px;">⚠️ Bottleneck Limiting Production</span>`
+          : `<span style="color: #94a3b8; font-size: 11px;">-</span>`;
+
+        // Local / Domestic D-Series Cell
+        let dDisplay = '';
+        if (dStock > 0) {
+          dDisplay = `<div style="line-height: 1.3;"><strong style="color: #1e293b; font-size: 12px;">${dParts}</strong><br><span style="color: #15803d; font-weight: 800; font-size: 12.5px;">${dStock < 10 && dStock % 1 !== 0 ? dStock.toFixed(3) : dStock.toLocaleString()} ${c.unit || ''}</span></div>`;
+        } else if (dParts !== '-') {
+          dDisplay = `<div style="line-height: 1.3;"><span style="color: #64748b; font-size: 11.5px;">${dParts}</span><br><span style="color: #94a3b8; font-size: 11px;">0 ${c.unit || ''}</span></div>`;
+        } else {
+          dDisplay = `<span style="color: #cbd5e1; font-size: 12px;">—</span>`;
+        }
+
+        // Imported I-Series Cell
+        let iDisplay = '';
+        if (iStock > 0) {
+          iDisplay = `<div style="line-height: 1.3;"><strong style="color: #1e293b; font-size: 12px;">${iParts}</strong><br><span style="color: #0369a1; font-weight: 800; font-size: 12.5px;">${iStock < 10 && iStock % 1 !== 0 ? iStock.toFixed(3) : iStock.toLocaleString()} ${c.unit || ''}</span></div>`;
+        } else if (iParts !== '-') {
+          iDisplay = `<div style="line-height: 1.3;"><span style="color: #64748b; font-size: 11.5px;">${iParts}</span><br><span style="color: #94a3b8; font-size: 11px;">0 ${c.unit || ''}</span></div>`;
+        } else {
+          iDisplay = `<span style="color: #cbd5e1; font-size: 12px;">—</span>`;
+        }
+
+        // Considered Stock Badge (Which is Available in Stores Sheet)
+        let sourceBadge = '';
+        if (sourceType === 'BOTH_AVAILABLE') {
+          sourceBadge = `<span class="badge" style="background: #f3e8ff; color: #6b21a8; font-size: 10.5px; padding: 2px 7px; font-weight: 700;">🟣 Both (D+I) in Stock</span>`;
+        } else if (sourceType === 'DOMESTIC_AVAILABLE') {
+          sourceBadge = `<span class="badge" style="background: #f0fdf4; color: #15803d; font-size: 10.5px; padding: 2px 7px; font-weight: 700;">🔵 Domestic (D) in Stock</span>`;
+        } else if (sourceType === 'IMPORTED_AVAILABLE') {
+          sourceBadge = `<span class="badge" style="background: #f0f9ff; color: #0369a1; font-size: 10.5px; padding: 2px 7px; font-weight: 700;">🟢 Imported (I) in Stock</span>`;
+        } else {
+          sourceBadge = `<span class="badge badge-red" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;">🔴 Zero Stock in Stores</span>`;
+        }
+
+        // Balance / Shortage Display
+        let balanceDisplay = '';
+        if (shortage > 0) {
+          balanceDisplay = `<span style="color: #b91c1c; font-weight: 800; font-size: 12.5px;">⚠️ -${shortage < 10 && shortage % 1 !== 0 ? shortage.toFixed(3) : Math.round(shortage).toLocaleString()} ${c.unit || ''}</span>`;
+        } else {
+          balanceDisplay = `<span style="color: #15803d; font-weight: 700; font-size: 12px;">+${surplus < 10 && surplus % 1 !== 0 ? surplus.toFixed(3) : Math.round(surplus).toLocaleString()} ${c.unit || ''}</span>`;
+        }
+
+        return `
+          <tr style="${isBottleneck ? 'background: #fff1f2;' : ''}">
+            <td>${statusTag}</td>
+            <td><span class="cat-badge ${getCatClass(c.category)}">${c.category}</span></td>
+            <td><strong style="color: #0f172a; font-size: 12.5px;">${c.rmPart}</strong></td>
+            <td><span style="color: #334155; font-size: 12px; font-weight: 500;">${c.rmDesc || '-'}</span></td>
+            <td style="background: #fcfdfc;">${dDisplay}</td>
+            <td style="background: #fcfdfe;">${iDisplay}</td>
+            <td style="text-align: right; background: #fefce8;">
+              <div style="font-weight: 800; color: #854d0e; font-size: 13px;">${avail < 10 && avail % 1 !== 0 ? avail.toFixed(3) : avail.toLocaleString()} ${c.unit || ''}</div>
+              <div style="margin-top: 3px;">${sourceBadge}</div>
+            </td>
+            <td style="text-align: right; font-weight: 700; color: #0284c7; font-size: 12.5px;">${c.ratio} <span style="font-size: 10.5px; color: #64748b;">${c.unit || ''}</span></td>
+            <td style="text-align: right; font-weight: 800; color: #1e40af; font-size: 12.5px;">${reqQty < 10 && reqQty % 1 !== 0 ? reqQty.toFixed(3) : Math.round(reqQty).toLocaleString()} ${c.unit || ''}</td>
+            <td style="text-align: right; background: ${shortage > 0 ? '#fef2f2' : '#f8fafc'};">${balanceDisplay}</td>
+            <td style="text-align: right; font-weight: 800; color: ${maxUnitsWithThis < fg.netProduction ? '#b91c1c' : '#15803d'}; font-size: 12.5px;">
+              ${maxUnitsWithThis.toLocaleString()} units
+            </td>
+            <td>${bneckAlert}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Render TAB 3: Common vs Individual RM Balances
+    function renderRMTable(rmResults) {
+      const tbody = document.getElementById("rm-table-body");
+      let list = [...rmResults];
+
+      if (currentRMFilterType === "COMMON") list = list.filter(r => r.isCommon);
+      else if (currentRMFilterType === "INDIVIDUAL") list = list.filter(r => !r.isCommon);
+      else if (currentRMFilterType === "SHORTAGE") list = list.filter(r => r.balanceNeedMaterial > 0);
+
+      if (searchFilter) {
+        list = list.filter(r => 
+          (r.rmPart || "").toLowerCase().includes(searchFilter) ||
+          (r.rmDesc || "").toLowerCase().includes(searchFilter) ||
+          (r.category || "").toLowerCase().includes(searchFilter)
+        );
+      }
+
+      tbody.innerHTML = list.map(rm => {
+        let badgeHtml = `<span class="badge badge-green">✓ Healthy</span>`;
+        if (rm.status === "RED_CRITICAL") badgeHtml = `<span class="badge badge-red">⚠️ Critical Deficit</span>`;
+        else if (rm.status === "YELLOW_REORDER") badgeHtml = `<span class="badge badge-yellow">⚡ Re-Order Buffer</span>`;
+
+        const isDeficit = rm.balanceNeedMaterial > 0;
+        const matchedSpecStr = rm.matchedStockParts && rm.matchedStockParts !== "NONE"
+          ? `<code style="font-size: 11px; color: #0369a1; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${rm.matchedStockParts}</code>`
+          : `<span style="color: #94a3b8; font-size: 11px;">Standard RM</span>`;
+
+        const usageTag = rm.isCommon
+          ? `<span class="tag-common" title="Used in ${rm.usedInModelsCount} models">🌐 Common (${rm.usedInModelsCount} models)</span>`
+          : `<span class="tag-indiv" title="Dedicated to 1 model">📌 Dedicated</span>`;
+
+        const rateStr = rm.rate && Number(rm.rate) > 0 ? `₹ ${Number(rm.rate).toFixed(2)}` : `-`;
+        const estValStr = rm.estPOValue > 0 ? `₹ ${Math.round(rm.estPOValue).toLocaleString()}` : `-`;
+
+        const dStock = Number(rm.domesticStock || 0);
+        const iStock = Number(rm.importedStock || 0);
+        const dParts = rm.domesticParts || "-";
+        const iParts = rm.importedParts || "-";
+
+        const dCell = dStock > 0 
+          ? `<strong style="color: #15803d;">${dStock.toLocaleString()}</strong> <div style="font-size: 10px; color: #64748b;">${dParts}</div>`
+          : `<span style="color: #94a3b8; font-size: 11px;">0</span> <div style="font-size: 10px; color: #94a3b8;">${dParts}</div>`;
+
+        const iCell = iStock > 0 
+          ? `<strong style="color: #0369a1;">${iStock.toLocaleString()}</strong> <div style="font-size: 10px; color: #64748b;">${iParts}</div>`
+          : `<span style="color: #94a3b8; font-size: 11px;">0</span> <div style="font-size: 10px; color: #94a3b8;">${iParts}</div>`;
+
+        return `
+          <tr>
+            <td>${badgeHtml}</td>
+            <td><strong style="color: #0f172a;">${rm.rmPart}</strong></td>
+            <td><span style="color: #475569; font-size: 12px;">${rm.rmDesc || '-'}</span></td>
+            <td><span class="cat-badge ${getCatClass(rm.category)}">${rm.category}</span></td>
+            <td>${usageTag}</td>
+            <td>${dCell}</td>
+            <td>${iCell}</td>
+            <td style="text-align: right; background: #f0fdf4;">
+              <input type="number" step="any" class="table-input" style="background: #fff; font-weight: 700; color: #166534;" value="${rm.stock}" onchange="updateRMStock('${rm.rmPart}', this.value)">
+              <span style="font-size: 11px; color: #166534;">${rm.unit || ''}</span>
+            </td>
+            <td style="text-align: right; color: #b91c1c; font-weight: 700;">-${Math.round(rm.grossReq).toLocaleString()} ${rm.unit || ''}</td>
+            <td style="text-align: right; font-weight: 700; color: ${rm.projectedBalance < 0 ? '#b91c1c' : '#1e293b'};">
+              ${Math.round(rm.projectedBalance).toLocaleString()} ${rm.unit || ''}
+            </td>
+            <td style="text-align: right; background: ${isDeficit ? '#fef2f2' : '#f8fafc'}; color: ${isDeficit ? '#b91c1c' : '#64748b'}; font-weight: 800;">
+              ${isDeficit ? `⚠️ ${Math.round(rm.balanceNeedMaterial).toLocaleString()} ${rm.unit || ''}` : `0`}
+            </td>
+            <td style="text-align: right; color: #475569; font-weight: 600;">${rateStr}</td>
+            <td style="text-align: right; font-weight: 800; color: #1d4ed8; background: #eff6ff;">
+              ${rm.suggestedOrder > 0 ? Math.round(rm.suggestedOrder).toLocaleString() + ' ' + (rm.unit || '') : '-'}
+            </td>
+            <td style="text-align: right; font-weight: 700; color: #15803d;">${estValStr}</td>
+            <td>
+              <input type="number" class="table-input" placeholder="${rm.calcSafety}" value="${rm.manualOverride !== null ? rm.manualOverride : ''}" onchange="updateRMSafetyOverride('${rm.rmPart}', this.value)">
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Render TAB 4: BOM Matrix Helper
+    function renderBOMTable(netProductionByPart, rmResults) {
+      const tbody = document.getElementById("bom-table-body");
+      const rmMap = {};
+      rmResults.forEach(r => { rmMap[r.rmPart] = r; });
+
+      let list = bomData;
+      if (selectedFilterPart) list = list.filter(b => b.fgPart === selectedFilterPart);
+      else if (showOpenOnly) list = list.filter(b => (netProductionByPart[b.fgPart] || 0) > 0);
+
+      tbody.innerHTML = list.map(b => {
+        const netFG = netProductionByPart[b.fgPart] || 0;
+        const netRMRequired = netFG * Number(b.ratio);
+        const rm = rmMap[b.rmPart] || { stock: 0 };
+        let formattedReq = (netRMRequired < 10 && netRMRequired % 1 !== 0) ? netRMRequired.toFixed(3) : Math.round(netRMRequired).toLocaleString();
+
+        const verificationTag = b.isExactMasterBOM
+          ? `<span class="badge badge-green">✓ Master BOM (19.03.2026)</span>`
+          : `<span class="badge" style="background: #f1f5f9; color: #64748b;">Standard BOM</span>`;
+
+        return `
+          <tr>
+            <td><strong>${b.fgPart}</strong></td>
+            <td><span style="font-weight: 600; color: #334155;">${b.customer || '-'}</span></td>
+            <td><span class="cat-badge ${getCatClass(b.category)}">${b.category}</span></td>
+            <td><strong style="color: #0f172a;">${b.rmPart}</strong></td>
+            <td><span style="color: #475569; font-size: 12px;">${b.rmDesc || '-'}</span></td>
+            <td style="text-align: right; font-weight: 700; color: #0284c7;">${b.ratio} ${b.unit || ''}</td>
+            <td style="text-align: right; font-weight: 600;">${netFG.toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 800; color: #1d4ed8; background: #eff6ff;">
+              ${formattedReq} ${b.unit || ''}
+            </td>
+            <td>${verificationTag}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Render TAB 5: Action List (How to Place New Orders)
+    function renderActionTable(criticalItems) {
+      const tbody = document.getElementById("action-table-body");
+      if (criticalItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: #15803d; padding: 25px;">✓ All raw material stocks are balanced. No open procurement orders needed.</td></tr>`;
+        document.getElementById("po-summary-pill").innerText = "All Stocks Balanced";
+        return;
+      }
+
+      let totalPOCost = 0;
+      let totalItemsToOrder = 0;
+
+      const rowsHtml = criticalItems.map(item => {
+        let badge = item.status === "RED_CRITICAL" 
+          ? `<span class="badge badge-red">🔴 Immediate PO Required</span>`
+          : `<span class="badge badge-yellow">🟠 Buffer Reorder</span>`;
+
+        const matchedSpecStr = item.matchedStockParts && item.matchedStockParts !== "NONE"
+          ? `<code style="font-size: 11px; color: #0369a1; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${item.matchedStockParts}</code>`
+          : `<span style="color: #94a3b8; font-size: 11px;">Standard Part</span>`;
+
+        const rateStr = item.rate && Number(item.rate) > 0 ? `₹ ${Number(item.rate).toFixed(2)}` : `-`;
+        const costNum = (item.suggestedOrder > 0 && item.rate) ? Math.round(item.suggestedOrder * Number(item.rate)) : 0;
+        const estCostStr = costNum > 0 ? `₹ ${costNum.toLocaleString()}` : `-`;
+
+        if (item.suggestedOrder > 0) {
+          totalPOCost += costNum;
+          totalItemsToOrder++;
+        }
+
+        const actionText = item.status === 'RED_CRITICAL'
+          ? `<span style="color: #b91c1c; font-weight: 700;">Issue Emergency PO for ${Math.round(item.suggestedOrder).toLocaleString()} ${item.unit} (Stockout Deficit)</span>`
+          : `<span style="color: #b45309; font-weight: 600;">Issue PO for ${Math.round(item.suggestedOrder).toLocaleString()} ${item.unit} (Safety Replenishment)</span>`;
+
+        return `
+          <tr>
+            <td>${badge}</td>
+            <td><strong style="font-size: 13.5px; color: #0f172a;">${item.rmPart}</strong></td>
+            <td><span style="color: #475569; font-size: 12px;">${item.rmDesc || '-'}</span></td>
+            <td><span class="cat-badge ${getCatClass(item.category)}">${item.category}</span></td>
+            <td>${matchedSpecStr}</td>
+            <td style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 700;">
+              ${Number(item.stock).toLocaleString()} ${item.unit || ''}
+            </td>
+            <td style="text-align: right; color: #b91c1c; font-weight: 700;">
+              -${Math.round(item.grossReq).toLocaleString()} ${item.unit || ''}
+            </td>
+            <td style="text-align: right; font-weight: 800; color: #b91c1c;">
+              ${item.balanceNeedMaterial > 0 ? `⚠️ ${Math.round(item.balanceNeedMaterial).toLocaleString()} ${item.unit || ''}` : `0`}
+            </td>
+            <td style="text-align: right; font-weight: 800; font-size: 15px; color: #1d4ed8; background: #eff6ff;">
+              ${Math.round(item.suggestedOrder).toLocaleString()} ${item.unit || ''}
+              <div style="font-size: 10px; color: #64748b; font-weight: 500;">MOQ: ${Number(item.moq).toLocaleString()}</div>
+            </td>
+            <td style="text-align: right; color: #475569; font-weight: 600;">${rateStr}</td>
+            <td style="text-align: right; font-weight: 800; color: #15803d; font-size: 14px;">${estCostStr}</td>
+            <td>${actionText}</td>
+          </tr>
+        `;
+      }).join("");
+
+      tbody.innerHTML = rowsHtml;
+      document.getElementById("po-summary-pill").innerText = `${totalItemsToOrder} Materials Requiring PO | Total Est. Cost: ₹ ${totalPOCost.toLocaleString()}`;
+    }
+
+    // Export Procurement Action Plan to CSV
+    function exportProcurementPlanCSV() {
+      const rmDemand = {};
+      const netProductionByPart = {};
+      fgParts.forEach(fg => {
+        const netProduction = Math.max(0, Number(fg.openQty || 0) - (Number(fg.fgStock || 0) + Number(fg.wipStock || 0)));
+        netProductionByPart[fg.partNo] = (netProductionByPart[fg.partNo] || 0) + netProduction;
+      });
+      bomData.forEach(b => {
+        const netFG = netProductionByPart[b.fgPart] || 0;
+        rmDemand[b.rmPart] = (rmDemand[b.rmPart] || 0) + (netFG * Number(b.ratio));
+      });
+
+      const rows = [
+        ["PO Priority", "RM Part Number", "Material Description", "Category", "Usage Type", "Domestic (D) Part", "Domestic Stock", "Imported (I) Part", "Imported Stock", "Total Usable Stock", "Store Unit", "BOM Gross Demand", "Net Shortage / Deficit", "Safety Target", "MOQ", "Recommended PO Qty", "Store Valuation Rate (INR)", "Est. Total Cost (INR)", "Action Instruction"]
+      ];
+
+      rmInventory.forEach(rm => {
+        const grossReq = rmDemand[rm.rmPart] || 0;
+        const projectedBalance = Number(rm.stock) - grossReq;
+        const effectiveSafety = (rm.manualOverride !== null && rm.manualOverride !== "" && !isNaN(rm.manualOverride))
+          ? Number(rm.manualOverride)
+          : Number(rm.calcSafety);
+        const balanceNeedMaterial = Math.max(0, grossReq - Number(rm.stock));
+
+        let status = "GREEN_HEALTHY";
+        if (projectedBalance <= effectiveSafety) status = "RED_CRITICAL";
+        else if (projectedBalance <= Number(rm.rol)) status = "YELLOW_REORDER";
+
+        if (status !== "GREEN_HEALTHY" && grossReq > 0) {
+          const shortageFromTarget = (Number(rm.rol) + effectiveSafety) - projectedBalance;
+          const moq = Number(rm.moq) || 1;
+          const suggestedOrder = Math.ceil(Math.max(moq, shortageFromTarget) / moq) * moq;
+          const estCost = rm.rate ? Math.round(suggestedOrder * Number(rm.rate)) : 0;
+          const action = status === 'RED_CRITICAL' ? 'Immediate PO Creation (Stockout Deficit)' : 'Safety Replenishment PO';
+
+          rows.push([
+            status === 'RED_CRITICAL' ? 'CRITICAL_STOCKOUT' : 'BUFFER_WARNING',
+            rm.rmPart,
+            `"${(rm.rmDesc || '').replace(/"/g, '""')}"`,
+            rm.category,
+            rm.isCommon ? 'COMMON_SHARED' : 'INDIVIDUAL_DEDICATED',
+            `"${(rm.domesticParts || '').replace(/"/g, '""')}"`,
+            rm.domesticStock || 0,
+            `"${(rm.importedParts || '').replace(/"/g, '""')}"`,
+            rm.importedStock || 0,
+            rm.stock,
+            rm.unit,
+            grossReq.toFixed(3),
+            balanceNeedMaterial.toFixed(3),
+            effectiveSafety,
+            rm.moq,
+            suggestedOrder,
+            rm.rate || 0,
+            estCost,
+            `"${action}"`
+          ]);
+        }
+      });
+
+      const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Procurement_Action_Plan_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function updateFGField(uniqueId, field, val) {
+      const target = fgParts.find(f => f.uniqueId === uniqueId);
+      if (target) {
+        target[field] = Math.max(0, Number(val) || 0);
+        saveState();
+      }
+    }
+
+    function updateRMStock(rmPart, val) {
+      const target = rmInventory.find(r => r.rmPart === rmPart);
+      if (target) {
+        target.stock = Math.max(0, Number(val) || 0);
+        saveState();
+      }
+    }
+
+    function updateRMSafetyOverride(rmPart, val) {
+      const target = rmInventory.find(r => r.rmPart === rmPart);
+      if (target) {
+        target.manualOverride = val === "" ? null : Math.max(0, Number(val) || 0);
+        saveState();
+      }
+    }
+
+    function reloadDailyData() {
+      if (confirm("Re-sync all data from Google Sheets (Master BOM, Open Orders Col AE & Stocks)? Local edits will reset to live store values.")) {
+        localStorage.removeItem("MFG_FG_STATE");
+        localStorage.removeItem("MFG_RM_DATA");
+        location.reload();
+      }
+    }
+
+    function toggleCompactModeApp() {
+      document.body.classList.toggle('compact-mode');
+      const isCompact = document.body.classList.contains('compact-mode');
+      const btn = document.getElementById('btn-compact-app');
+      if (btn) btn.innerText = isCompact ? '⚡ Compact View: ON' : '⚡ Compact View: OFF';
+    }
+
+    // Startup
+    populatePartDropdown();
+    runCalculations();
+  </script>
+</body>
+</html>

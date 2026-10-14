@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MRP Material Controller &amp; BOM Shortage Dashboard</title>
+  <!-- Tailwind CSS CDN with Dark Theme preset -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#172033',
+              900: '#0f172a',
+              950: '#020617',
+            },
+            emerald: {
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              950: '#022c22',
+            },
+            amber: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              950: '#451a03',
+            },
+            rose: {
+              400: '#fb7185',
+              500: '#ef4444',
+              600: '#dc2626',
+              950: '#4c0519',
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* High-visibility horizontal and vertical scrollbars */
+    ::-webkit-scrollbar { width: 9px; height: 12px; }
+    ::-webkit-scrollbar-track { background: #0b1120; border-radius: 6px; }
+    ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 6px; border: 2px solid #0b1120; }
+    ::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
+
+    .scroll-container::-webkit-scrollbar { height: 13px; width: 9px; }
+    .scroll-container::-webkit-scrollbar-track { background: #090d16; border-radius: 8px; border: 1px solid #1e293b; }
+    .scroll-container::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 8px; border: 2px solid #090d16; }
+    .scroll-container::-webkit-scrollbar-thumb:hover { background: #818cf8; }
+
+    /* Sticky Frozen First Column */
+    .sticky-col-header {
+      position: sticky;
+      left: 0;
+      z-index: 30 !important;
+      background: #0f172a !important;
+      box-shadow: 3px 0 8px rgba(0,0,0,0.5);
+    }
+    .sticky-col-cell {
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      background: #1e293b;
+      box-shadow: 3px 0 8px rgba(0,0,0,0.5);
+    }
+    tr:hover .sticky-col-cell {
+      background: #27354a !important;
+    }
+
+    /* Compact High-Density Easy View */
+    body.compact-mode table th {
+      padding-top: 6px !important;
+      padding-bottom: 6px !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+      font-size: 11px !important;
+    }
+    body.compact-mode table td {
+      padding-top: 5px !important;
+      padding-bottom: 5px !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+      font-size: 11.5px !important;
+    }
+    body.compact-mode .kpi-box {
+      padding: 12px 16px !important;
+    }
+    body.compact-mode .kpi-num {
+      font-size: 1.5rem !important;
+      line-height: 1.8rem !important;
+    }
+
+    /* Instant Visual Comprehension Tints */
+    .row-shortage {
+      background-color: rgba(239, 68, 68, 0.05);
+    }
+    .row-shortage:hover {
+      background-color: rgba(239, 68, 68, 0.12) !important;
+    }
+    .row-stocked {
+      background-color: rgba(16, 185, 129, 0.02);
+    }
+    .row-stocked:hover {
+      background-color: rgba(16, 185, 129, 0.08) !important;
+    }
+  </style>
+</head>
+<body class="compact-mode bg-[#0f172a] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top App Navigation Bar -->
+  <header class="border-b border-slate-800 bg-[#1e293b]/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & System Branding -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-0.5 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <div class="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
+            <i data-lucide="boxes" class="w-5 h-5 text-indigo-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight text-white">InvenMRP</span>
+            <span class="px-2 py-0.5 text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">v2.4 Live</span>
+          </div>
+          <p class="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Real-Time BOM Explosion &amp; Warehouse Shortage Controller
+          </p>
+        </div>
+      </div>
+
+      <!-- Action Utilities & Data Sync Status -->
+      <div class="flex items-center gap-2.5">
+        <div id="live-sync-indicator" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-850 border border-slate-700/60 text-xs text-slate-300">
+          <i data-lucide="cloud" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Synced: <strong id="sync-time" class="text-white">14 Oct 2026, 02:25 PM</strong></span>
+        </div>
+
+        <!-- View Density Toggle -->
+        <button onclick="toggleCompactMode()" id="btn-density" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm" title="Toggle Compact High-Density View">
+          <i data-lucide="minimize-2" class="w-3.5 h-3.5 text-indigo-400" id="density-icon"></i>
+          <span id="density-label">Compact: ON</span>
+        </button>
+
+        <button onclick="triggerLiveResync()" id="btn-sync" class="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-600/20 transition active:scale-95">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
+          <span class="hidden sm:inline">Refresh Data</span>
+        </button>
+
+        <button onclick="openDataModal()" class="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">
+          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Data Sources</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- TOP KPI METRICS STRIP -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- KPI 1: Active Demand -->
+      <div class="bg-[#1e293b] border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm hover:border-slate-700 transition">
+        <div class="absolute -right-3 -bottom-3 text-slate-850/40 pointer-events-none">
+          <i data-lucide="shopping-cart" class="w-24 h-24 stroke-[1]"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Customer Demand</span>
+          <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-open-orders" class="text-2xl font-black text-white font-mono tracking-tight">62</span>
+          <span class="text-xs text-slate-400 font-medium">Orders Pending</span>
+        </div>
+        <div class="mt-2 text-xs text-indigo-300/90 font-medium flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span id="kpi-total-fg-qty">677,298</span> Total Units in Col AE
+        </div>
+      </div>
+
+      <!-- KPI 2: Total Unique BOM Raw Materials -->
+      <div class="bg-[#1e293b] border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm hover:border-slate-700 transition">
+        <div class="absolute -right-3 -bottom-3 text-slate-850/40 pointer-events-none">
+          <i data-lucide="cpu" class="w-24 h-24 stroke-[1]"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Raw Materials in BOM</span>
+          <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-unique-rm" class="text-2xl font-black text-white font-mono tracking-tight">89</span>
+          <span class="text-xs text-slate-400 font-medium">Unique RM Part Codes</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400 font-medium flex items-center gap-1.5">
+          <i data-lucide="check-circle" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Exploded from Master BOM (19.03.2026)</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: 100% Covered / Stocked Items (Emerald) -->
+      <div class="bg-[#1e293b] border border-emerald-950/60 rounded-2xl p-5 relative overflow-hidden shadow-sm hover:border-emerald-800/40 transition">
+        <div class="absolute -right-3 -bottom-3 text-emerald-950/30 pointer-events-none">
+          <i data-lucide="shield-check" class="w-24 h-24 stroke-[1]"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">100% Stocked Materials</span>
+          <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-stocked-rm" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">22</span>
+          <span class="text-xs text-emerald-300 font-medium">Sufficient in Warehouse</span>
+        </div>
+        <div class="mt-2 text-xs text-emerald-400/90 font-medium flex items-center gap-1.5">
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+          <span>Zero Shortage / Immediate Line Issue</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: Critical Shortage Items (Rose) -->
+      <div class="bg-[#1e293b] border border-rose-950/60 rounded-2xl p-5 relative overflow-hidden shadow-sm hover:border-rose-800/40 transition">
+        <div class="absolute -right-3 -bottom-3 text-rose-950/30 pointer-events-none">
+          <i data-lucide="alert-triangle" class="w-24 h-24 stroke-[1]"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-rose-400">Critical Shortage Items</span>
+          <span class="p-2 rounded-xl bg-rose-500/10 text-rose-400">
+            <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-shortage-rm" class="text-2xl font-black text-rose-400 font-mono tracking-tight">67</span>
+          <span class="text-xs text-rose-300 font-medium">Buy Needed / Deficit</span>
+        </div>
+        <div class="mt-2 text-xs text-rose-400/90 font-medium flex items-center gap-1.5">
+          <i data-lucide="arrow-down-right" class="w-3.5 h-3.5"></i>
+          <span>Blocks production until PO fulfillment</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Navigation Tabs Navigation -->
+    <div class="flex items-center justify-between border-b border-slate-800 pt-2">
+      <div class="flex items-center gap-2">
+        <button onclick="switchTab('tab-procurement')" id="tab-btn-procurement" class="flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition border-indigo-500 text-indigo-400">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>1. Master Procurement Shortage Summary</span>
+          <span id="badge-tab-shortage-count" class="ml-1.5 px-2 py-0.5 text-xs font-bold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">67 Short</span>
+        </button>
+        <button onclick="switchTab('tab-allocation')" id="tab-btn-allocation" class="flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition border-transparent text-slate-400 hover:text-slate-200">
+          <i data-lucide="git-merge" class="w-4 h-4"></i>
+          <span>2. Part-Wise &amp; Order Allocation View</span>
+          <span class="ml-1.5 px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700">62 Orders</span>
+        </button>
+      </div>
+
+      <!-- Quick Export Utility -->
+      <div class="flex items-center gap-2 pb-2">
+        <button onclick="exportProcurementPlanCSV()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Export CSV</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: MASTER PROCUREMENT SHORTAGE SUMMARY -->
+    <!-- ============================================================== -->
+    <section id="tab-procurement" class="space-y-4">
+      
+      <!-- Control Bar: Search, Category Filters, and Shortage Toggle -->
+      <div class="bg-[#1e293b] border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+        
+        <!-- Search Input -->
+        <div class="relative flex-1 max-w-md">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input 
+            type="text" 
+            id="search-rm" 
+            placeholder="Search RM Part Number, Description, or Wire Size..." 
+            oninput="handleSearch(this.value)"
+            class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+          >
+        </div>
+
+        <!-- Filter Pills & Checkbox -->
+        <div class="flex flex-wrap items-center gap-2">
+          
+          <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+            <button onclick="setCategoryFilter('ALL')" id="pill-cat-ALL" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold transition">All (89)</button>
+            <button onclick="setCategoryFilter('Bobbin')" id="pill-cat-Bobbin" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Bobbin</button>
+            <button onclick="setCategoryFilter('Core')" id="pill-cat-Core" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Core</button>
+            <button onclick="setCategoryFilter('Wire')" id="pill-cat-Wire" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Wire</button>
+            <button onclick="setCategoryFilter('Tape')" id="pill-cat-Tape" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Tape</button>
+            <button onclick="setCategoryFilter('Sleeve')" id="pill-cat-Sleeve" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Sleeve</button>
+          </div>
+
+          <label class="flex items-center gap-2 px-3 py-1.5 bg-rose-950/20 border border-rose-900/40 rounded-xl text-xs font-semibold text-rose-300 cursor-pointer hover:bg-rose-950/30 transition select-none">
+            <input type="checkbox" id="toggle-shortages-only" onchange="toggleShortagesOnly(this.checked)" class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 focus:ring-offset-slate-900 bg-slate-900 border-slate-700 cursor-pointer">
+            <span>Show Shortages Only</span>
+          </label>
+
+        </div>
+
+      </div>
+
+      <!-- Master Shortage Data Table -->
+      <div class="bg-[#1e293b] border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        
+        <!-- Horizontal Scroll Controller Bar -->
+        <div class="bg-slate-900/90 px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+            <span class="font-bold text-slate-200">↔ Move Table Left / Right:</span>
+            <span class="text-slate-400 hidden md:inline">Use the buttons below or drag the scrollbar to view all columns</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="scrollTableHorizontally('procurement-table-scroll', -350)" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+              <i data-lucide="chevron-left" class="w-4 h-4 text-indigo-400"></i> Scroll Left
+            </button>
+            <button onclick="scrollTableHorizontally('procurement-table-scroll', 350)" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+              Scroll Right <i data-lucide="chevron-right" class="w-4 h-4 text-indigo-400"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="procurement-table-scroll" class="scroll-container overflow-x-auto overflow-y-auto max-h-[620px]">
+          <table class="w-full text-left border-collapse text-xs min-w-[1350px] whitespace-nowrap">
+            <thead class="bg-slate-900/95 backdrop-blur text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800 sticky top-0 z-30 text-[11px]">
+              <tr>
+                <th class="py-3.5 px-4 sticky-col-header min-w-[180px]">RM Part Number (Fixed)</th>
+                <th class="py-3.5 px-4 min-w-[280px]">Material Specification &amp; Category</th>
+                <th class="py-3.5 px-4 text-right min-w-[150px]">Total Required Qty</th>
+                <th class="py-3.5 px-4 text-right min-w-[150px]">Daily Warehouse Stock</th>
+                <th class="py-3.5 px-4 text-right min-w-[150px]">Net Shortage Qty</th>
+                <th class="py-3.5 px-4 min-w-[200px]">Stock Coverage %</th>
+                <th class="py-3.5 px-4 text-center min-w-[160px]">Procurement Action</th>
+                <th class="py-3.5 px-4 text-center min-w-[140px]">Impacted Orders</th>
+              </tr>
+            </thead>
+            <tbody id="procurement-table-body" class="divide-y divide-slate-800/60 font-medium">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Table Footer Summary -->
+        <div class="p-3 bg-slate-900/60 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400 px-4">
+          <div id="table-display-count">Showing 89 raw materials</div>
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 100% Covered (Sufficient)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 50% - 99% Partial</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> &lt; 50% Critical Deficit</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: PART-WISE & ORDER ALLOCATION VIEW -->
+    <!-- ============================================================== -->
+    <section id="tab-allocation" class="space-y-4 hidden">
+      
+      <!-- Filter & Search for Orders -->
+      <div class="bg-[#1e293b] border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+        <div class="relative flex-1 max-w-md">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input 
+            type="text" 
+            id="search-fg" 
+            placeholder="Search Finished Good Part No (e.g. 9010-8452) or Customer..." 
+            oninput="handleFGSearch(this.value)"
+            class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+          >
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Status Filters -->
+          <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+            <button onclick="setFGFilter('ALL')" id="fg-pill-ALL" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold transition">All (62)</button>
+            <button onclick="setFGFilter('READY')" id="fg-pill-READY" class="px-3 py-1.5 rounded-lg text-emerald-400 hover:text-white transition">🟢 Feasible (17)</button>
+            <button onclick="setFGFilter('BLOCKED')" id="fg-pill-BLOCKED" class="px-3 py-1.5 rounded-lg text-rose-400 hover:text-white transition">🔴 Shortage (45)</button>
+          </div>
+
+          <!-- View Mode Switcher -->
+          <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+            <button onclick="setFGViewMode('TABLE')" id="btn-mode-table" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="table" class="w-3.5 h-3.5"></i> Compact Table
+            </button>
+            <button onclick="setFGViewMode('ACCORDION')" id="btn-mode-accordion" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+              <i data-lucide="layers" class="w-3.5 h-3.5"></i> Detailed Cards
+            </button>
+          </div>
+
+          <!-- Accordion Bulk Expand/Collapse -->
+          <div id="accordion-toggle-buttons" class="hidden flex items-center gap-1.5">
+            <button onclick="toggleAllAccordions(true)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition">
+              ⏬ Expand All
+            </button>
+            <button onclick="toggleAllAccordions(false)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition">
+              ⏫ Collapse All
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container of Finished Goods Orders (Table or Accordions) -->
+      <div id="allocation-accordion-container" class="space-y-3">
+        <!-- Dynamically injected table or accordions -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Order BOM Explosion Modal (for Compact Table View) -->
+  <div id="order-bom-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i>
+            <span>BOM Explosion &amp; Warehouse Stock for Order:</span>
+            <code id="bom-modal-fg-part" class="font-mono text-indigo-300 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-800">9010-8452</code>
+          </h3>
+          <p id="bom-modal-fg-desc" class="text-xs text-slate-400 mt-0.5">DIXON | Open Demand: 30,000 Units</p>
+        </div>
+        <button onclick="closeOrderBOMModal()" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1 scroll-container">
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left text-xs min-w-[950px] whitespace-nowrap">
+            <thead class="bg-slate-900 text-slate-400 font-semibold uppercase text-[10px] border-b border-slate-800 sticky top-0 z-20">
+              <tr>
+                <th class="py-2.5 px-3 sticky-col-header min-w-[170px]">BOM Part Number</th>
+                <th class="py-2.5 px-3 min-w-[220px]">Description &amp; Category</th>
+                <th class="py-2.5 px-3 text-right min-w-[100px]">Usage / Unit</th>
+                <th class="py-2.5 px-3 text-right min-w-[120px]">Gross Required</th>
+                <th class="py-2.5 px-3 text-right min-w-[120px]">Warehouse Stock</th>
+                <th class="py-2.5 px-3 text-right min-w-[130px]">Balance / Shortage</th>
+                <th class="py-2.5 px-3 text-right min-w-[100px]">Can Build</th>
+                <th class="py-2.5 px-3 text-center min-w-[110px]">Status</th>
+              </tr>
+            </thead>
+            <tbody id="order-bom-modal-body" class="divide-y divide-slate-800/60 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between">
+        <div id="bom-modal-summary" class="text-xs text-slate-400"></div>
+        <button onclick="closeOrderBOMModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Impacted Orders Modal -->
+  <div id="impact-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400"></i>
+            <span>Orders Impacted by Raw Material:</span>
+            <code id="impact-rm-part" class="font-mono text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-800">4008 01 I008</code>
+          </h3>
+          <p id="impact-rm-desc" class="text-xs text-slate-400 mt-0.5">Copper Wire 0.30mm</p>
+        </div>
+        <button onclick="closeImpactModal()" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1">
+        <table class="w-full text-left text-xs">
+          <thead class="text-slate-400 uppercase text-[10px] border-b border-slate-800 font-bold">
+            <tr>
+              <th class="py-2">Finished Good Part</th>
+              <th class="py-2">Customer</th>
+              <th class="py-2 text-right">Order Qty</th>
+              <th class="py-2 text-right">RM Required</th>
+            </tr>
+          </thead>
+          <tbody id="impact-table-body" class="divide-y divide-slate-800 font-medium"></tbody>
+        </table>
+      </div>
+
+      <div class="p-3 bg-slate-900 border-t border-slate-800 text-right">
+        <button onclick="closeImpactModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Sources Configuration Modal -->
+  <div id="data-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <i data-lucide="database" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="text-base font-bold text-white">Google Sheets &amp; Data Pipeline Configuration</h3>
+        </div>
+        <button onclick="closeDataModal()" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200">1. Open Orders Sheet (Customer Demand - GID 0)</label>
+            <a href="https://docs.google.com/spreadsheets/d/1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0/edit?gid=0#gid=0" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+          </div>
+          <input type="text" id="cfg-sheet-orders" value="https://docs.google.com/spreadsheets/d/1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0/edit?gid=0#gid=0" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200">2. Master BOM Sheet (BOM Explosion - GID 199313343)</label>
+            <a href="https://docs.google.com/spreadsheets/d/1JKoQnYm1BSBkZUVSqYYXsb8VshuWo9tyar3dUtetnHk/edit?gid=199313343#gid=199313343" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+          </div>
+          <input type="text" id="cfg-sheet-bom" value="https://docs.google.com/spreadsheets/d/1JKoQnYm1BSBkZUVSqYYXsb8VshuWo9tyar3dUtetnHk/edit?gid=199313343#gid=199313343" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200">3. Stocks Sheet (Daily Warehouse Stock - GID 82202164)</label>
+            <a href="https://docs.google.com/spreadsheets/d/1mmIHjG_BKIiV_02duivofXyJpWyM3T_h_Fq670m7eaU/edit?gid=82202164#gid=82202164" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+          </div>
+          <input type="text" id="cfg-sheet-stocks" value="https://docs.google.com/spreadsheets/d/1mmIHjG_BKIiV_02duivofXyJpWyM3T_h_Fq670m7eaU/edit?gid=82202164#gid=82202164" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+        </div>
+
+        <!-- Optional: Live Google Apps Script Endpoint -->
+        <div class="pt-2 border-t border-slate-800">
+          <label class="block font-bold text-slate-200 mb-1">Live Google Apps Script Web App Endpoint (Optional)</label>
+          <div class="flex gap-2">
+            <input type="text" id="cfg-gas-url" placeholder="Paste your deployed Web App URL here (https://script.google.com/macros/s/.../exec)" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-[11px] focus:outline-none focus:border-indigo-500">
+            <button onclick="saveAndSyncGAS()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold text-xs transition">Connect &amp; Sync</button>
+          </div>
+          <p class="text-[10.5px] text-slate-400 mt-1">Deploy `google_apps_script.gs` in your Google Account for 100% automated live sync without manual download.</p>
+        </div>
+
+        <div class="p-3 bg-indigo-950/30 border border-indigo-900/40 rounded-xl text-indigo-300 text-[11.5px] leading-relaxed">
+          <p><strong>Clean Parsing &amp; Normalization Active:</strong></p>
+          <p class="mt-1 text-slate-400">• Part numbers: normalized to uppercase with collapsed spaces.<br>• Quantities: auto-strips units (e.g. "125.500 Kgs", "3,125 Pcs") into exact numbers.<br>• Missing warehouse parts: safely resolved to 0 stock without failing.</p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+        <button onclick="closeDataModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-Loaded Datasets (Zero latency on page load) -->
+  <script src="open_orders_data.js?v=20261014_1430"></script>
+  <script src="bom_data.js?v=20261014_1430"></script>
+  <script src="rm_data.js?v=20261014_1430"></script>
+  <script src="sync_status.js?v=20261014_1430"></script>
+
+  <!-- CORE MRP COMPUTATIONAL ENGINE & UI SCRIPT -->
+  <script>
+    // State Store
+    let rawOrders = window.rawOpenOrdersData || [];
+    let rawBOM = window.rawMasterBOMData || window.rawBOMData || [];
+    let rawRM = window.rawRMData || [];
+    
+    let activeOpenOrders = [];
+    let procurementData = [];
+    let orderAllocations = [];
+    
+    let currentTab = 'procurement';
+    let currentCategoryFilter = 'ALL';
+    let showShortagesOnly = false;
+    let procurementSearchTerm = '';
+    
+    let currentFGFilter = 'ALL';
+    let fgSearchTerm = '';
+    let fgViewMode = 'TABLE'; // 'TABLE' (Compact Summary Table) or 'ACCORDION' (Cards)
+    let isCompactMode = true;
+
+    // Normalization Helpers
+    function normalizePartNo(str) {
+      if (!str) return '';
+      return String(str).trim().replace(/\s+/g, ' ').toUpperCase();
+    }
+
+    function cleanNumber(val) {
+      if (val === null || val === undefined) return 0.0;
+      if (typeof val === 'number') return isNaN(val) ? 0.0 : val;
+      const clean = String(val).replace(/,/g, '').replace(/[^\d.-]/g, '');
+      const parsed = parseFloat(clean);
+      return isNaN(parsed) ? 0.0 : parsed;
+    }
+
+    // MAIN MRP CALCULATION ENGINE
+    function calculateMRP() {
+      // 1. Filter Active Open Orders (CURRENT OPEN QTY > 0)
+      activeOpenOrders = rawOrders.filter(o => cleanNumber(o.openQty) > 0).map(o => ({
+        ...o,
+        partNo: normalizePartNo(o.partNo),
+        openQty: cleanNumber(o.openQty),
+        customer: (o.customer || '').trim(),
+        desc: (o.desc || '').trim(),
+        itemCode: (o.itemCode || '').trim()
+      }));
+
+      // 2. Build Daily Stocks Lookup Map
+      const stockMap = new Map();
+      const rmMetaMap = new Map();
+      rawRM.forEach(r => {
+        const norm = normalizePartNo(r.rmPart);
+        const avail = cleanNumber(r.stock);
+        stockMap.set(norm, avail);
+        rmMetaMap.set(norm, r);
+      });
+
+      // 3. Part-Wise Order BOM Explosion
+      const factoryDemandMap = new Map(); // RM Part -> { totalReq, unit, desc, category, orders: [] }
+      orderAllocations = [];
+
+      let readyCount = 0;
+      let blockedCount = 0;
+
+      activeOpenOrders.forEach(order => {
+        const fgComps = rawBOM.filter(b => normalizePartNo(b.fgPart) === order.partNo);
+        let orderHasShortage = false;
+        let maxBuildableUnits = Infinity;
+        const explodedLines = [];
+
+        fgComps.forEach(comp => {
+          const rmNorm = normalizePartNo(comp.rmPart);
+          const ratio = cleanNumber(comp.ratio) || 1.0;
+          const grossRequired = order.openQty * ratio;
+          const currentStock = stockMap.get(rmNorm) || 0.0;
+          const unit = comp.unit || 'Nos';
+          const desc = comp.rmDesc || rmMetaMap.get(rmNorm)?.rmDesc || 'Raw Material';
+          const cat = comp.category || rmMetaMap.get(rmNorm)?.category || 'General';
+
+          // Order-level coverage check
+          let coverageStatus = 'FULL';
+          if (currentStock <= 0) {
+            coverageStatus = 'CRITICAL_ZERO';
+            orderHasShortage = true;
+          } else if (currentStock < grossRequired) {
+            coverageStatus = 'PARTIAL';
+            orderHasShortage = true;
+          }
+
+          const canBuildWithThis = Math.floor(currentStock / ratio);
+          if (canBuildWithThis < maxBuildableUnits) {
+            maxBuildableUnits = canBuildWithThis;
+          }
+
+          explodedLines.push({
+            rmPart: comp.rmPart,
+            rmNorm,
+            desc,
+            category: cat,
+            ratio,
+            grossRequired,
+            currentStock,
+            deficit: Math.max(0, grossRequired - currentStock),
+            surplus: Math.max(0, currentStock - grossRequired),
+            unit,
+            coverageStatus,
+            canBuildWithThis
+          });
+
+          // Aggregate Factory Consolidated Demand
+          if (!factoryDemandMap.has(rmNorm)) {
+            factoryDemandMap.set(rmNorm, {
+              rmPart: comp.rmPart,
+              rmNorm,
+              desc,
+              category: cat,
+              unit,
+              totalRequired: 0.0,
+              currentStock,
+              orders: []
+            });
+          }
+          const rec = factoryDemandMap.get(rmNorm);
+          rec.totalRequired += grossRequired;
+          rec.orders.push({
+            fgPart: order.partNo,
+            customer: order.customer,
+            orderQty: order.openQty,
+            grossRequired
+          });
+        });
+
+        if (fgComps.length === 0) {
+          orderHasShortage = true;
+          maxBuildableUnits = 0;
+        }
+
+        if (maxBuildableUnits === Infinity) maxBuildableUnits = 0;
+
+        if (orderHasShortage) blockedCount++;
+        else readyCount++;
+
+        orderAllocations.push({
+          ...order,
+          components: explodedLines,
+          hasShortage: orderHasShortage,
+          maxBuildableUnits,
+          statusLabel: orderHasShortage ? 'Blocked by Shortage' : 'Ready to Produce',
+          statusColor: orderHasShortage ? 'rose' : 'emerald'
+        });
+      });
+
+      // 4. Build Master Procurement Shortage Summary
+      procurementData = [];
+      let stockedCount = 0;
+      let shortageCount = 0;
+
+      factoryDemandMap.forEach((val, rmNorm) => {
+        const netShortage = Math.max(0, val.totalRequired - val.currentStock);
+        const freeStock = Math.max(0, val.currentStock - val.totalRequired);
+        const coveragePct = val.totalRequired > 0 
+          ? Math.min(999, Math.round((val.currentStock / val.totalRequired) * 100))
+          : 100;
+
+        let action = 'STOCKED';
+        let actionColor = 'emerald';
+        if (netShortage > 0) {
+          action = 'BUY NEEDED';
+          actionColor = 'rose';
+          shortageCount++;
+        } else {
+          stockedCount++;
+        }
+
+        procurementData.push({
+          ...val,
+          netShortage,
+          freeStock,
+          coveragePct,
+          action,
+          actionColor
+        });
+      });
+
+      // Sort by Net Shortage descending, then Part No
+      procurementData.sort((a, b) => b.netShortage - a.netShortage || a.rmNorm.localeCompare(b.rmNorm));
+
+      // 5. Update KPI Strip
+      document.getElementById('kpi-open-orders').innerText = activeOpenOrders.length.toLocaleString();
+      const totalFG = activeOpenOrders.reduce((sum, o) => sum + o.openQty, 0);
+      document.getElementById('kpi-total-fg-qty').innerText = Math.round(totalFG).toLocaleString();
+      document.getElementById('kpi-unique-rm').innerText = procurementData.length;
+      document.getElementById('kpi-stocked-rm').innerText = stockedCount;
+      document.getElementById('kpi-shortage-rm').innerText = shortageCount;
+      document.getElementById('badge-tab-shortage-count').innerText = `${shortageCount} Short`;
+
+      // Update Order Allocation filter badges
+      document.getElementById('fg-pill-ALL').innerText = `All Orders (${activeOpenOrders.length})`;
+      document.getElementById('fg-pill-READY').innerText = `🟢 Ready to Produce (${readyCount})`;
+      document.getElementById('fg-pill-BLOCKED').innerText = `🔴 Blocked by Shortage (${blockedCount})`;
+
+      // Render Views
+      renderProcurementTable();
+      renderOrderAllocations();
+      lucide.createIcons();
+    }
+
+    // RENDER TAB 1: MASTER PROCUREMENT SUMMARY TABLE
+    function renderProcurementTable() {
+      const tbody = document.getElementById('procurement-table-body');
+      let filtered = [...procurementData];
+
+      // Category filter
+      if (currentCategoryFilter !== 'ALL') {
+        filtered = filtered.filter(item => 
+          (item.category || '').toLowerCase().includes(currentCategoryFilter.toLowerCase()) ||
+          (item.desc || '').toLowerCase().includes(currentCategoryFilter.toLowerCase())
+        );
+      }
+
+      // Shortages only filter
+      if (showShortagesOnly) {
+        filtered = filtered.filter(item => item.netShortage > 0);
+      }
+
+      // Search term
+      if (procurementSearchTerm) {
+        const s = procurementSearchTerm.toLowerCase();
+        filtered = filtered.filter(item => 
+          item.rmNorm.toLowerCase().includes(s) ||
+          item.desc.toLowerCase().includes(s) ||
+          item.category.toLowerCase().includes(s)
+        );
+      }
+
+      document.getElementById('table-display-count').innerText = `Showing ${filtered.length} of ${procurementData.length} raw materials`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400">No raw materials match the selected search or shortage filters.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(row => {
+        // Coverage progress bar styling
+        let barColor = 'bg-emerald-500';
+        let badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+        if (row.coveragePct < 50) {
+          barColor = 'bg-rose-500';
+          badgeColor = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+        } else if (row.coveragePct < 100) {
+          barColor = 'bg-amber-500';
+          badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+        }
+
+        const barWidth = Math.min(100, row.coveragePct);
+
+        // Format decimal numbers nicely
+        const reqStr = formatQty(row.totalRequired, row.unit);
+        const stockStr = formatQty(row.currentStock, row.unit);
+        const shortStr = row.netShortage > 0 ? formatQty(row.netShortage, row.unit) : '0';
+
+        const actionBadge = row.netShortage > 0
+          ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm shadow-rose-900/30">
+               <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> BUY NEEDED
+             </span>`
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> STOCKED
+             </span>`;
+
+        const isShortage = row.netShortage > 0;
+        return `
+          <tr class="hover:bg-slate-800/40 transition ${isShortage ? 'row-shortage' : 'row-stocked'}">
+            <!-- RM Part Number (Sticky Frozen Column) -->
+            <td class="py-2 px-3 font-mono font-bold text-slate-100 text-[12px] sticky-col-cell">
+              ${row.rmPart}
+            </td>
+            
+            <!-- Description -->
+            <td class="py-2 px-3">
+              <div class="font-medium text-slate-200 text-xs">${row.desc}</div>
+              <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                <span class="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-semibold">${row.category}</span>
+                <span>Unit: ${row.unit}</span>
+              </div>
+            </td>
+
+            <!-- Total Required -->
+            <td class="py-2 px-3 text-right font-mono font-bold text-slate-100 text-xs">
+              ${reqStr}
+            </td>
+
+            <!-- Daily Stock -->
+            <td class="py-2 px-3 text-right font-mono font-semibold text-slate-300 text-xs">
+              ${stockStr}
+            </td>
+
+            <!-- Net Shortage / Free Surplus -->
+            <td class="py-2 px-3 text-right font-mono text-xs">
+              ${isShortage 
+                ? `<span class="text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-900/60 font-bold">-${shortStr}</span>` 
+                : `<span class="text-emerald-400/90 font-medium">+${formatQty(row.freeStock, row.unit)} Surplus</span>`}
+            </td>
+
+            <!-- Stock Coverage % -->
+            <td class="py-2 px-3">
+              <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                <span class="font-bold ${isShortage ? 'text-rose-400' : 'text-emerald-400'}">${row.coveragePct}%</span>
+                <span class="text-[10px] text-slate-400">${stockStr} / ${reqStr}</span>
+              </div>
+              <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full rounded-full ${barColor} transition-all duration-500" style="width: ${barWidth}%"></div>
+              </div>
+            </td>
+
+            <!-- Procurement Action -->
+            <td class="py-2 px-3 text-center">
+              ${actionBadge}
+            </td>
+
+            <!-- Impacted Orders Link -->
+            <td class="py-2 px-3 text-center">
+              ${isShortage
+                ? `<button onclick="viewImpactedOrders('${row.rmNorm}')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[11px] font-semibold border border-rose-900/50 transition">
+                     <span>🔴 ${row.orders.length} Order(s)</span>
+                     <i data-lucide="external-link" class="w-3 h-3"></i>
+                   </button>`
+                : `<button onclick="viewImpactedOrders('${row.rmNorm}')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-slate-700/60 transition">
+                     <span>🟢 ${row.orders.length} Order(s)</span>
+                     <i data-lucide="external-link" class="w-3 h-3"></i>
+                   </button>`}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // RENDER TAB 2: PART-WISE & ORDER ALLOCATION VIEW
+    function renderOrderAllocations() {
+      const container = document.getElementById('allocation-accordion-container');
+      let filtered = [...orderAllocations];
+
+      // Status filter
+      if (currentFGFilter === 'READY') {
+        filtered = filtered.filter(o => !o.hasShortage);
+      } else if (currentFGFilter === 'BLOCKED') {
+        filtered = filtered.filter(o => o.hasShortage);
+      }
+
+      // Search term
+      if (fgSearchTerm) {
+        const s = fgSearchTerm.toLowerCase();
+        filtered = filtered.filter(o => 
+          o.partNo.toLowerCase().includes(s) ||
+          o.customer.toLowerCase().includes(s) ||
+          o.desc.toLowerCase().includes(s) ||
+          o.itemCode.toLowerCase().includes(s)
+        );
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="bg-[#1e293b] border border-slate-800 rounded-2xl p-10 text-center text-slate-400">No customer orders match the current filter.</div>`;
+        return;
+      }
+
+      // OPTION A: COMPACT ORDERS SUMMARY TABLE VIEW
+      if (fgViewMode === 'TABLE') {
+        const rows = filtered.map((order, idx) => {
+          const isReady = !order.hasShortage;
+          const shortComps = order.components.filter(c => c.deficit > 0);
+          
+          let bottleneckHtml = '';
+          if (isReady) {
+            bottleneckHtml = `<span class="inline-flex items-center gap-1 text-emerald-400 text-xs font-medium"><i data-lucide="check" class="w-3.5 h-3.5"></i> All ${order.components.length} BOM items stocked</span>`;
+          } else {
+            bottleneckHtml = `<div class="flex flex-wrap items-center gap-1">` + 
+              shortComps.slice(0, 2).map(c => 
+                `<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 font-mono text-[10.5px] border border-rose-900/60 font-semibold" title="${c.desc}">
+                  ${c.rmPart} (-${formatQty(c.deficit, c.unit)})
+                </span>`
+              ).join('') + 
+              (shortComps.length > 2 ? `<span class="text-[10px] text-slate-400 font-semibold">+${shortComps.length - 2} more</span>` : '') +
+              `</div>`;
+          }
+
+          const statusBadge = isReady
+            ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Ready to Produce
+               </span>`
+            : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> Blocked
+               </span>`;
+
+          return `
+            <tr class="hover:bg-slate-800/40 transition ${isReady ? 'row-stocked' : 'row-shortage'}">
+              <td class="py-2 px-3 text-center text-slate-400 font-mono text-xs">${idx + 1}</td>
+              <td class="py-2 px-3 font-mono font-bold text-white text-[12.5px] sticky-col-cell">
+                ${order.partNo}
+                ${order.itemCode ? `<span class="text-slate-400 font-normal text-[10.5px] block font-mono">${order.itemCode}</span>` : ''}
+              </td>
+              <td class="py-2 px-3 text-xs font-semibold text-slate-300">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700/80">${order.customer || 'Customer'}</span>
+              </td>
+              <td class="py-2 px-3 text-xs text-slate-300">
+                <div class="truncate max-w-[220px]" title="${order.desc || ''}">${order.desc || 'Transformer / Inductor'}</div>
+              </td>
+              <td class="py-2 px-3 text-right font-mono font-bold text-white text-xs">
+                ${order.openQty.toLocaleString()}
+              </td>
+              <td class="py-2 px-3 text-right font-mono font-bold text-xs">
+                ${isReady 
+                  ? `<span class="text-emerald-400">${order.openQty.toLocaleString()}</span>` 
+                  : `<span class="${order.maxBuildableUnits > 0 ? 'text-amber-400' : 'text-slate-500'}">${order.maxBuildableUnits.toLocaleString()}</span>`}
+              </td>
+              <td class="py-2 px-3 text-center">
+                ${statusBadge}
+              </td>
+              <td class="py-2 px-3">
+                ${bottleneckHtml}
+              </td>
+              <td class="py-2 px-3 text-center">
+                <button onclick="openOrderBOMModal('${order.partNo}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold transition active:scale-95 shadow-sm">
+                  <i data-lucide="layers" class="w-3 h-3 text-indigo-400"></i>
+                  <span>BOM (${order.components.length})</span>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="bg-[#1e293b] border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div class="bg-slate-900/90 px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-bold text-slate-200">📋 Compact Production Feasibility Register (${filtered.length} Orders)</span>
+                <span class="text-slate-400 hidden lg:inline">↔ Move left/right to view all columns</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="scrollTableHorizontally('orders-table-scroll', -350)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
+                  <i data-lucide="chevron-left" class="w-3.5 h-3.5 text-indigo-400"></i> Scroll Left
+                </button>
+                <button onclick="scrollTableHorizontally('orders-table-scroll', 350)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
+                  Scroll Right <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-indigo-400"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="orders-table-scroll" class="scroll-container overflow-x-auto overflow-y-auto max-h-[620px]">
+              <table class="w-full text-left border-collapse text-xs min-w-[1300px] whitespace-nowrap">
+                <thead class="bg-slate-900/95 backdrop-blur text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800 sticky top-0 z-30 text-[11px]">
+                  <tr>
+                    <th class="py-2.5 px-3 sticky-col-header min-w-[50px] text-center">#</th>
+                    <th class="py-2.5 px-3 sticky-col-header min-w-[170px]" style="left: 50px;">FG Part Number (Fixed)</th>
+                    <th class="py-2.5 px-3 min-w-[130px]">Customer</th>
+                    <th class="py-2.5 px-3 min-w-[220px]">Description / Model</th>
+                    <th class="py-2.5 px-3 text-right min-w-[140px]">Open Order Demand</th>
+                    <th class="py-2.5 px-3 text-right min-w-[140px]">Max Units Buildable</th>
+                    <th class="py-2.5 px-3 text-center min-w-[170px]">Feasibility Status</th>
+                    <th class="py-2.5 px-3 min-w-[260px]">Shortage Bottleneck Material(s)</th>
+                    <th class="py-2.5 px-3 text-center min-w-[130px]">BOM Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 font-medium">
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="p-3 bg-slate-900/60 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400 px-4">
+              <div>Showing ${filtered.length} customer finished goods orders</div>
+              <div class="flex items-center gap-4">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 100% Feasible (All RM in stock)</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Blocked by Material Shortage</span>
+              </div>
+            </div>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      // OPTION B: DETAILED ACCORDION BOM CARDS VIEW
+      container.innerHTML = filtered.map((order, idx) => {
+        const isReady = !order.hasShortage;
+        const statusBadge = isReady
+          ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+               <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Ready to Produce (100% RM Available)
+             </span>`
+          : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+               <i data-lucide="alert-octagon" class="w-3.5 h-3.5"></i> Blocked by Shortage (Max ${order.maxBuildableUnits.toLocaleString()} units)
+             </span>`;
+
+        const rowsHtml = order.components.map(comp => {
+          let lineBadge = '';
+          if (comp.coverageStatus === 'FULL') {
+            lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">✓ Sufficient</span>`;
+          } else if (comp.coverageStatus === 'PARTIAL') {
+            lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">⚠️ Partial</span>`;
+          } else {
+            lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">🔴 Zero Stock</span>`;
+          }
+
+          return `
+            <tr class="hover:bg-slate-900/40">
+              <td class="py-2.5 px-3 font-mono font-bold text-slate-200 text-xs sticky-col-cell">${comp.rmPart}</td>
+              <td class="py-2.5 px-3 text-xs text-slate-300">${comp.desc} <span class="text-slate-500 text-[10px]">(${comp.category})</span></td>
+              <td class="py-2.5 px-3 text-right font-mono text-slate-300 text-xs">${comp.ratio}</td>
+              <td class="py-2.5 px-3 text-right font-mono font-bold text-indigo-300 text-xs">${formatQty(comp.grossRequired, comp.unit)}</td>
+              <td class="py-2.5 px-3 text-right font-mono font-semibold text-slate-300 text-xs">${formatQty(comp.currentStock, comp.unit)}</td>
+              <td class="py-2.5 px-3 text-right font-mono font-bold text-xs">
+                ${comp.deficit > 0 ? `<span class="text-rose-400">-${formatQty(comp.deficit, comp.unit)}</span>` : `<span class="text-emerald-400">+${formatQty(comp.surplus, comp.unit)}</span>`}
+              </td>
+              <td class="py-2.5 px-3 text-right font-mono text-xs text-slate-300 font-semibold">${comp.canBuildWithThis.toLocaleString()}</td>
+              <td class="py-2.5 px-3 text-center">${lineBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-[#1e293b] border ${isReady ? 'border-emerald-950/50 hover:border-emerald-800/40' : 'border-slate-800 hover:border-slate-700'} rounded-2xl overflow-hidden transition shadow-sm">
+            
+            <!-- Accordion Header -->
+            <button onclick="toggleAccordion('acc-${idx}')" class="w-full p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-left hover:bg-slate-800/40 transition">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg ${isReady ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center font-bold text-xs">
+                  #${idx + 1}
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-extrabold text-sm text-white">${order.partNo}</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">${order.customer || 'Customer'}</span>
+                    ${order.itemCode ? `<span class="text-[11px] text-slate-400 font-mono">(${order.itemCode})</span>` : ''}
+                  </div>
+                  <div class="text-xs text-slate-400 mt-0.5">${order.desc || 'Transformer / Inductor Assembly'}</div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4">
+                <div class="text-right">
+                  <div class="text-[11px] text-slate-400 uppercase font-semibold">Open Order Demand</div>
+                  <div class="font-mono font-bold text-sm text-white">${order.openQty.toLocaleString()} Units</div>
+                </div>
+                ${statusBadge}
+                <i data-lucide="chevron-down" id="acc-icon-acc-${idx}" class="w-5 h-5 text-slate-400 transition-transform duration-200"></i>
+              </div>
+            </button>
+
+            <!-- Accordion Body -->
+            <div id="acc-${idx}" class="border-t border-slate-800 bg-slate-900/70 p-4 hidden">
+              <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>Bill of Materials (BOM) Component Breakdown</span>
+                <span class="text-slate-500 text-[11px]">↔ Drag or scroll horizontally to see all columns</span>
+              </div>
+              <div class="scroll-container overflow-x-auto rounded-xl border border-slate-800">
+                <table class="w-full text-left text-xs min-w-[1050px] whitespace-nowrap">
+                  <thead class="bg-slate-900 text-slate-400 font-semibold uppercase text-[10px] border-b border-slate-800 sticky top-0 z-20">
+                    <tr>
+                      <th class="py-2.5 px-3 sticky-col-header min-w-[170px]">BOM Part Number</th>
+                      <th class="py-2.5 px-3 min-w-[220px]">Description &amp; Category</th>
+                      <th class="py-2.5 px-3 text-right min-w-[110px]">Usage / Unit</th>
+                      <th class="py-2.5 px-3 text-right min-w-[120px]">Gross Required</th>
+                      <th class="py-2.5 px-3 text-right min-w-[120px]">Warehouse Stock</th>
+                      <th class="py-2.5 px-3 text-right min-w-[130px]">Balance / Shortage</th>
+                      <th class="py-2.5 px-3 text-right min-w-[110px]">Can Build</th>
+                      <th class="py-2.5 px-3 text-center min-w-[120px]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/60 font-medium">
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // Horizontal Table Scroll Helper
+    function scrollTableHorizontally(elementId, distance) {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.scrollBy({ left: distance, behavior: 'smooth' });
+      }
+    }
+
+    // Toggle Accordion Visibility
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById(`acc-icon-${id}`);
+      if (el) {
+        el.classList.toggle('hidden');
+        if (icon) icon.classList.toggle('rotate-180');
+      }
+    }
+
+    // UI Helper: Format Qty nicely
+    function formatQty(val, unit) {
+      const num = Number(val) || 0;
+      if (num < 10 && num % 1 !== 0) return num.toFixed(3);
+      if (num % 1 !== 0) return num.toFixed(2);
+      return Math.round(num).toLocaleString();
+    }
+
+    // Search and Filter Handlers
+    function handleSearch(val) {
+      procurementSearchTerm = val.trim();
+      renderProcurementTable();
+    }
+
+    function setCategoryFilter(cat) {
+      currentCategoryFilter = cat;
+      ['ALL', 'Bobbin', 'Core', 'Wire', 'Tape', 'Sleeve'].forEach(c => {
+        const el = document.getElementById(`pill-cat-${c}`);
+        if (el) {
+          if (c === cat) {
+            el.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold transition';
+          } else {
+            el.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+          }
+        }
+      });
+      renderProcurementTable();
+    }
+
+    function toggleShortagesOnly(checked) {
+      showShortagesOnly = checked;
+      renderProcurementTable();
+    }
+
+    function handleFGSearch(val) {
+      fgSearchTerm = val.trim();
+      renderOrderAllocations();
+    }
+
+    function setFGFilter(filter) {
+      currentFGFilter = filter;
+      ['ALL', 'READY', 'BLOCKED'].forEach(f => {
+        const el = document.getElementById(`fg-pill-${f}`);
+        if (el) {
+          if (f === filter) {
+            el.className = 'px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold transition';
+          } else {
+            el.className = 'px-3.5 py-1.5 rounded-xl bg-slate-900 text-slate-400 border border-slate-700/80 text-xs font-semibold hover:text-white transition';
+          }
+        }
+      });
+      renderOrderAllocations();
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.getElementById('tab-procurement').classList.toggle('hidden', tabId !== 'tab-procurement');
+      document.getElementById('tab-allocation').classList.toggle('hidden', tabId !== 'tab-allocation');
+
+      const btnProc = document.getElementById('tab-btn-procurement');
+      const btnAlloc = document.getElementById('tab-btn-allocation');
+
+      if (tabId === 'tab-procurement') {
+        btnProc.className = 'flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition border-indigo-500 text-indigo-400';
+        btnAlloc.className = 'flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition border-transparent text-slate-400 hover:text-slate-200';
+      } else {
+        btnProc.className = 'flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition border-transparent text-slate-400 hover:text-slate-200';
+        btnAlloc.className = 'flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition border-indigo-500 text-indigo-400';
+      }
+    }
+
+    // Modal: Impacted Orders
+    function viewImpactedOrders(rmNorm) {
+      const item = procurementData.find(p => p.rmNorm === rmNorm);
+      if (!item) return;
+
+      document.getElementById('impact-rm-part').innerText = item.rmPart;
+      document.getElementById('impact-rm-desc').innerText = `${item.desc} (${item.category}) | Warehouse Stock: ${item.currentStock.toLocaleString()} ${item.unit}`;
+      
+      const tbody = document.getElementById('impact-table-body');
+      tbody.innerHTML = item.orders.map(o => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-2.5 px-2 font-mono font-bold text-white">${o.fgPart}</td>
+          <td class="py-2.5 px-2 text-slate-300">${o.customer || 'Customer'}</td>
+          <td class="py-2.5 px-2 text-right font-mono font-semibold text-slate-300">${Math.round(o.orderQty).toLocaleString()}</td>
+          <td class="py-2.5 px-2 text-right font-mono font-bold text-rose-400">${formatQty(o.grossRequired, item.unit)}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('impact-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeImpactModal() {
+      document.getElementById('impact-modal').classList.add('hidden');
+    }
+
+    function openDataModal() {
+      document.getElementById('data-modal').classList.remove('hidden');
+    }
+
+    function closeDataModal() {
+      document.getElementById('data-modal').classList.add('hidden');
+    }
+
+    // Toggle High-Density Compact Easy View
+    function toggleCompactMode() {
+      document.body.classList.toggle('compact-mode');
+      isCompactMode = document.body.classList.contains('compact-mode');
+      localStorage.setItem('INVENMRP_COMPACT', isCompactMode ? '1' : '0');
+      const lbl = document.getElementById('density-label');
+      const icon = document.getElementById('density-icon');
+      if (lbl) lbl.innerText = isCompactMode ? 'Compact: ON' : 'Compact: OFF';
+      if (icon) {
+        icon.setAttribute('data-lucide', isCompactMode ? 'minimize-2' : 'maximize-2');
+        lucide.createIcons();
+      }
+    }
+
+    // Switch between Tab 2 Compact Table vs Detailed BOM Cards
+    function setFGViewMode(mode) {
+      fgViewMode = mode;
+      const btnTable = document.getElementById('btn-mode-table');
+      const btnAcc = document.getElementById('btn-mode-accordion');
+      const bulkBtns = document.getElementById('accordion-toggle-buttons');
+
+      if (mode === 'TABLE') {
+        btnTable.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold flex items-center gap-1.5 transition shadow-sm';
+        btnAcc.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition';
+        if (bulkBtns) bulkBtns.classList.add('hidden');
+      } else {
+        btnTable.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition';
+        btnAcc.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold flex items-center gap-1.5 transition shadow-sm';
+        if (bulkBtns) bulkBtns.classList.remove('hidden');
+      }
+      renderOrderAllocations();
+    }
+
+    // Expand / Collapse all accordion cards
+    function toggleAllAccordions(expand) {
+      const bodies = document.querySelectorAll('[id^="acc-"]');
+      bodies.forEach(b => {
+        if (expand) b.classList.remove('hidden');
+        else b.classList.add('hidden');
+      });
+      const icons = document.querySelectorAll('[id^="acc-icon-acc-"]');
+      icons.forEach(ic => {
+        if (expand) ic.classList.add('rotate-180');
+        else ic.classList.remove('rotate-180');
+      });
+    }
+
+    // Modal: Detailed BOM Explosion for Order
+    function openOrderBOMModal(partNo) {
+      const order = orderAllocations.find(o => o.partNo === partNo);
+      if (!order) return;
+
+      document.getElementById('bom-modal-fg-part').innerText = order.partNo;
+      document.getElementById('bom-modal-fg-desc').innerText = `${order.customer || 'Customer'} | ${order.desc || ''} | Open Order Demand: ${order.openQty.toLocaleString()} Units`;
+
+      const tbody = document.getElementById('order-bom-modal-body');
+      tbody.innerHTML = order.components.map(comp => {
+        let lineBadge = '';
+        if (comp.coverageStatus === 'FULL') {
+          lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">✓ Sufficient</span>`;
+        } else if (comp.coverageStatus === 'PARTIAL') {
+          lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">⚠️ Partial</span>`;
+        } else {
+          lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">🔴 Zero Stock</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-2.5 px-3 font-mono font-bold text-slate-200 text-xs">${comp.rmPart}</td>
+            <td class="py-2.5 px-3 text-xs text-slate-300">${comp.desc} <span class="text-slate-500 text-[10px]">(${comp.category})</span></td>
+            <td class="py-2.5 px-3 text-right font-mono text-slate-300 text-xs">${comp.ratio}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-indigo-300 text-xs">${formatQty(comp.grossRequired, comp.unit)}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-semibold text-slate-300 text-xs">${formatQty(comp.currentStock, comp.unit)}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-xs">
+              ${comp.deficit > 0 ? `<span class="text-rose-400 bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-900/50">-${formatQty(comp.deficit, comp.unit)}</span>` : `<span class="text-emerald-400">+${formatQty(comp.surplus, comp.unit)}</span>`}
+            </td>
+            <td class="py-2.5 px-3 text-right font-mono text-xs text-slate-300 font-semibold">${comp.canBuildWithThis.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-center">${lineBadge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('bom-modal-summary').innerHTML = `
+        <span class="text-xs">Feasibility Status: <strong class="${order.hasShortage ? 'text-rose-400' : 'text-emerald-400'}">${order.hasShortage ? 'Blocked by Shortage (Max ' + order.maxBuildableUnits.toLocaleString() + ' Units)' : '100% Feasible to Produce'}</strong></span>
+      `;
+
+      document.getElementById('order-bom-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeOrderBOMModal() {
+      document.getElementById('order-bom-modal').classList.add('hidden');
+    }
+
+    // Export Master Procurement Summary to CSV
+    function exportProcurementPlanCSV() {
+      let csv = "RM Part Number,Material Description,Category,Unit,Total Required Qty,Current Daily Stock,Net Shortage Qty,Surplus Free Stock,Stock Coverage %,Procurement Action,Impacted Orders Count\n";
+
+      procurementData.forEach(r => {
+        csv += `"${r.rmPart}","${(r.desc || '').replace(/"/g, '""')}","${r.category}","${r.unit}",${r.totalRequired},${r.currentStock},${r.netShortage},${r.freeStock},${r.coveragePct}%,"${r.action}",${r.orders.length}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MRP_Master_Procurement_Shortage_Report_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Trigger Live Re-Sync from Google Sheets
+    async function triggerLiveResync() {
+      const btn = document.getElementById('btn-sync');
+      const icon = document.getElementById('sync-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        // Attempt fetching live sync status / updated data
+        const res = await fetch(`sync_status.json?t=${Date.now()}`);
+        if (res.ok) {
+          const status = await res.json();
+          document.getElementById('sync-time').innerText = status.lastSyncDisplay || 'Live';
+        }
+      } catch (e) {
+        console.warn('Local file fetch fallback');
+      }
+
+      calculateMRP();
+
+      setTimeout(() => {
+        if (icon) icon.classList.remove('animate-spin');
+      }, 600);
+    }
+
+    async function saveAndSyncGAS() {
+      const url = (document.getElementById('cfg-gas-url')?.value || '').trim();
+      if (!url) {
+        alert("Please enter a valid Google Apps Script Web App URL.");
+        return;
+      }
+      localStorage.setItem("INVENMRP_GAS_URL", url);
+      const icon = document.getElementById('sync-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const fetchUrl = url + (url.includes('?') ? '&' : '?') + 'action=json&t=' + Date.now();
+        const res = await fetch(fetchUrl);
+        const data = await res.json();
+        if (data.success) {
+          if (data.timestamp) document.getElementById('sync-time').innerText = data.timestamp;
+          calculateMRP();
+          alert("✅ Live Synced from Google Sheets successfully!");
+          closeDataModal();
+        } else {
+          alert("Apps Script error: " + (data.message || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Note: To allow direct browser fetch, ensure the Google Apps Script Web App deployment has 'Who has access' set to 'Anyone'.\n\nError: " + err.message);
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedCompact = localStorage.getItem("INVENMRP_COMPACT");
+      if (savedCompact === '0') {
+        document.body.classList.remove('compact-mode');
+        isCompactMode = false;
+        const lbl = document.getElementById('density-label');
+        const icon = document.getElementById('density-icon');
+        if (lbl) lbl.innerText = 'Compact: OFF';
+        if (icon) icon.setAttribute('data-lucide', 'maximize-2');
+      }
+
+      const savedGAS = localStorage.getItem("INVENMRP_GAS_URL");
+      if (savedGAS && document.getElementById('cfg-gas-url')) {
+        document.getElementById('cfg-gas-url').value = savedGAS;
+      }
+      calculateMRP();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
