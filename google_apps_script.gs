@@ -27,9 +27,19 @@
 // Global Configuration: Exact Spreadsheet IDs and Target GIDs
 var SPREADSHEETS = {
   ORDERS: {
-    id: "1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0",
+    id: "1-bVdXQ7eDiRF3876wHDdaD94kbVRII7Mq3DU37e4EGg", // open order FG(14.10.2026)
     gid: 0,
-    name: "OPEN ORDER UPDATE FILE 2025"
+    name: "open order FG(14.10.2026)"
+  },
+  FG_STOCKS: {
+    id: "1F7a15XQvWvRBjFOWRO2-gSiMfj3vw16c0FWUW28XCa4", // Daily FG stock (14.10.2026)
+    gid: 0,
+    name: "Daily FG stock (14.10.2026)"
+  },
+  WIP_STOCKS: {
+    id: "112padFLp9mRsSuN39Xy3umFOsjUmSOMvHPtnyIauNik", // Daily wip Stock
+    gid: 0,
+    name: "Daily wip Stock"
   },
   BOM: {
     id: "1JKoQnYm1BSBkZUVSqYYXsb8VshuWo9tyar3dUtetnHk",
@@ -260,15 +270,73 @@ function runMRPCalculation() {
     stockMap[sNorm] = (stockMap[sNorm] || 0.0) + sQty;
   }
 
-  // 4. COMPUTATIONAL SHORTAGE ENGINE
-  // Part-Wise Order BOM Explosion
+  // 4. FETCH SHEET 4: Daily FG Stock (14.10.2026)
+  var fgStockMap = {};
+  try {
+    var fgSS = SpreadsheetApp.openById(SPREADSHEETS.FG_STOCKS.id);
+    var fgSheet = getSheetByGid(fgSS, SPREADSHEETS.FG_STOCKS.gid);
+    var fgData = fgSheet.getDataRange().getValues();
+    var colMapFG = { partNo: 0, qty: 1 };
+    for (var fgr = 0; fgr < Math.min(3, fgData.length); fgr++) {
+      for (var fgc = 0; fgc < fgData[fgr].length; fgc++) {
+        var fgh = String(fgData[fgr][fgc]).trim().toUpperCase();
+        if (fgh.indexOf("PART") !== -1 || fgh.indexOf("ITEM") !== -1 || fgh.indexOf("TALLY") !== -1) colMapFG.partNo = fgc;
+        if (fgh.indexOf("QTY") !== -1 || fgh.indexOf("STOCK") !== -1 || fgh.indexOf("BALANCE") !== -1 || fgh.indexOf("CLOSING") !== -1) colMapFG.qty = fgc;
+      }
+    }
+    for (var fi = 1; fi < fgData.length; fi++) {
+      var fRow = fgData[fi];
+      var fPart = normalizePartNo(fRow[colMapFG.partNo] || fRow[0]);
+      if (fPart) {
+        var fQty = cleanNumber(fRow[colMapFG.qty] || fRow[1]);
+        fgStockMap[fPart] = (fgStockMap[fPart] || 0.0) + fQty;
+      }
+    }
+  } catch (errFG) {
+    Logger.log("Notice: Error reading FG Stock sheet: " + errFG.toString());
+  }
+
+  // 5. FETCH SHEET 5: Daily WIP Stock
+  var wipStockMap = {};
+  try {
+    var wipSS = SpreadsheetApp.openById(SPREADSHEETS.WIP_STOCKS.id);
+    var wipSheet = getSheetByGid(wipSS, SPREADSHEETS.WIP_STOCKS.gid);
+    var wipData = wipSheet.getDataRange().getValues();
+    var colMapWIP = { partNo: 0, qty: 1 };
+    for (var wr = 0; wr < Math.min(3, wipData.length); wr++) {
+      for (var wc = 0; wc < wipData[wr].length; wc++) {
+        var wh = String(wipData[wr][wc]).trim().toUpperCase();
+        if (wh.indexOf("PART") !== -1 || wh.indexOf("ITEM") !== -1 || wh.indexOf("TALLY") !== -1) colMapWIP.partNo = wc;
+        if (wh.indexOf("QTY") !== -1 || wh.indexOf("STOCK") !== -1 || wh.indexOf("WIP") !== -1 || wh.indexOf("BALANCE") !== -1) colMapWIP.qty = wc;
+      }
+    }
+    for (var wi = 1; wi < wipData.length; wi++) {
+      var wRow = wipData[wi];
+      var wPart = normalizePartNo(wRow[colMapWIP.partNo] || wRow[0]);
+      if (wPart) {
+        var wQty = cleanNumber(wRow[colMapWIP.qty] || wRow[1]);
+        wipStockMap[wPart] = (wipStockMap[wPart] || 0.0) + wQty;
+      }
+    }
+  } catch (errWIP) {
+    Logger.log("Notice: Error reading WIP Stock sheet: " + errWIP.toString());
+  }
+
+  // 6. COMPUTATIONAL SHORTAGE ENGINE (WITH PRODUCTION STOCK NETTING)
+  // Formula: Balance Qty = Math.max(0, Order Qty - FG Stock Qty - WIP Stock Qty)
   var factoryDemand = {};
   var orderAllocations = [];
   var readyOrdersCount = 0;
   var blockedOrdersCount = 0;
+  var totalBalanceQty = 0;
 
   for (var oi = 0; oi < activeOrders.length; oi++) {
     var ord = activeOrders[oi];
+    var fgStock = fgStockMap[ord.partNo] || 0.0;
+    var wipStock = wipStockMap[ord.partNo] || 0.0;
+    var balanceQty = Math.max(0, ord.openQty - fgStock - wipStock);
+    totalBalanceQty += balanceQty;
+
     var orderComps = [];
     var orderHasShortage = false;
     var maxBuildable = Infinity;
@@ -282,11 +350,14 @@ function runMRPCalculation() {
     var explodedItems = [];
     for (var ci = 0; ci < orderComps.length; ci++) {
       var comp = orderComps[ci];
-      var grossReq = ord.openQty * comp.ratio;
+      // Raw Material Demand is strictly based on Balance Qty
+      var grossReq = balanceQty * comp.ratio;
       var availStock = stockMap[comp.rmNorm] !== undefined ? stockMap[comp.rmNorm] : 0.0;
       
       var covStatus = "FULL";
-      if (availStock <= 0) {
+      if (balanceQty === 0) {
+        covStatus = "COVERED_BY_FG";
+      } else if (availStock <= 0) {
         covStatus = "ZERO_STOCK";
         orderHasShortage = true;
       } else if (availStock < grossReq) {
@@ -294,7 +365,7 @@ function runMRPCalculation() {
         orderHasShortage = true;
       }
 
-      var canBuild = Math.floor(availStock / comp.ratio);
+      var canBuild = comp.ratio > 0 ? Math.floor(availStock / comp.ratio) : 0;
       if (canBuild < maxBuildable) maxBuildable = canBuild;
 
       explodedItems.push({
@@ -312,36 +383,53 @@ function runMRPCalculation() {
         canBuild: canBuild
       });
 
-      // Factory Consolidated Demand
-      if (!factoryDemand[comp.rmNorm]) {
-        factoryDemand[comp.rmNorm] = {
-          rmPart: comp.rmPart,
-          rmNorm: comp.rmNorm,
-          desc: comp.desc,
-          category: comp.category,
-          unit: comp.unit,
-          totalRequired: 0.0,
-          availableStock: availStock,
-          orders: []
-        };
+      // Factory Consolidated Demand (Only if balanceQty > 0)
+      if (grossReq > 0) {
+        if (!factoryDemand[comp.rmNorm]) {
+          factoryDemand[comp.rmNorm] = {
+            rmPart: comp.rmPart,
+            rmNorm: comp.rmNorm,
+            desc: comp.desc,
+            category: comp.category,
+            unit: comp.unit,
+            totalRequired: 0.0,
+            availableStock: availStock,
+            orders: []
+          };
+        }
+        factoryDemand[comp.rmNorm].totalRequired += grossReq;
+        factoryDemand[comp.rmNorm].orders.push({
+          fgPart: ord.partNo,
+          customer: ord.customer,
+          orderQty: ord.openQty,
+          balanceQty: balanceQty,
+          grossRequired: grossReq
+        });
       }
-      factoryDemand[comp.rmNorm].totalRequired += grossReq;
-      factoryDemand[comp.rmNorm].orders.push({
-        fgPart: ord.partNo,
-        customer: ord.customer,
-        orderQty: ord.openQty,
-        grossRequired: grossReq
-      });
     }
 
-    if (orderComps.length === 0) {
-      orderHasShortage = true;
-      maxBuildable = 0;
-    }
-    if (maxBuildable === Infinity) maxBuildable = 0;
+    if (balanceQty === 0) {
+      // Order is already fully satisfied by FG Stock and WIP Stock!
+      orderHasShortage = false;
+      maxBuildable = ord.openQty;
+      readyOrdersCount++;
+    } else {
+      if (orderComps.length === 0) {
+        orderHasShortage = true;
+        maxBuildable = 0;
+      }
+      if (maxBuildable === Infinity) maxBuildable = 0;
 
-    if (orderHasShortage) blockedOrdersCount++;
-    else readyOrdersCount++;
+      if (orderHasShortage) blockedOrdersCount++;
+      else readyOrdersCount++;
+    }
+
+    var statusLabel = "Ready to Produce";
+    if (balanceQty === 0) {
+      statusLabel = "Fully Covered by FG/WIP Stock";
+    } else if (orderHasShortage) {
+      statusLabel = "Blocked by Shortage";
+    }
 
     orderAllocations.push({
       partNo: ord.partNo,
@@ -349,9 +437,12 @@ function runMRPCalculation() {
       desc: ord.desc,
       itemCode: ord.itemCode,
       openQty: ord.openQty,
+      fgStock: fgStock,
+      wipStock: wipStock,
+      balanceQty: balanceQty,
       hasShortage: orderHasShortage,
       maxBuildable: maxBuildable,
-      statusLabel: orderHasShortage ? "Blocked by Shortage" : "Ready to Produce",
+      statusLabel: statusLabel,
       components: explodedItems
     });
   }

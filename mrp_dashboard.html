@@ -809,15 +809,31 @@
       <div class="space-y-3.5 text-xs">
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-200">1. Open Orders Sheet (Customer Demand - GID 0)</label>
-            <a href="https://docs.google.com/spreadsheets/d/1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0/edit?gid=0#gid=0" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+            <label class="font-bold text-slate-200">1. Open Orders Sheet: open order FG(14.10.2026)</label>
+            <a href="https://docs.google.com/spreadsheets/d/1-bVdXQ7eDiRF3876wHDdaD94kbVRII7Mq3DU37e4EGg/edit?gid=0#gid=0" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
           </div>
-          <input type="text" id="cfg-sheet-orders" value="https://docs.google.com/spreadsheets/d/1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0/edit?gid=0#gid=0" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+          <input type="text" id="cfg-sheet-orders" value="https://docs.google.com/spreadsheets/d/1-bVdXQ7eDiRF3876wHDdaD94kbVRII7Mq3DU37e4EGg/edit?gid=0#gid=0" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
         </div>
 
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-200">2. Master BOM Sheet (BOM Explosion - GID 199313343)</label>
+            <label class="font-bold text-slate-200">2. Daily FG Stock (14.10.2026)</label>
+            <a href="https://docs.google.com/spreadsheets/d/1F7a15XQvWvRBjFOWRO2-gSiMfj3vw16c0FWUW28XCa4/edit?gid=0#gid=0" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+          </div>
+          <input type="text" id="cfg-sheet-fgstock" value="https://docs.google.com/spreadsheets/d/1F7a15XQvWvRBjFOWRO2-gSiMfj3vw16c0FWUW28XCa4/edit?gid=0#gid=0" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200">3. Daily WIP Stock</label>
+            <a href="https://docs.google.com/spreadsheets/d/112padFLp9mRsSuN39Xy3umFOsjUmSOMvHPtnyIauNik/edit?gid=0#gid=0" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
+          </div>
+          <input type="text" id="cfg-sheet-wipstock" value="https://docs.google.com/spreadsheets/d/112padFLp9mRsSuN39Xy3umFOsjUmSOMvHPtnyIauNik/edit?gid=0#gid=0" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200">4. Master BOM Sheet (BOM Explosion - GID 199313343)</label>
             <a href="https://docs.google.com/spreadsheets/d/1JKoQnYm1BSBkZUVSqYYXsb8VshuWo9tyar3dUtetnHk/edit?gid=199313343#gid=199313343" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
           </div>
           <input type="text" id="cfg-sheet-bom" value="https://docs.google.com/spreadsheets/d/1JKoQnYm1BSBkZUVSqYYXsb8VshuWo9tyar3dUtetnHk/edit?gid=199313343#gid=199313343" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
@@ -825,7 +841,7 @@
 
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-200">3. Stocks Sheet (Daily Warehouse Stock - GID 82202164)</label>
+            <label class="font-bold text-slate-200">5. Stocks Sheet (Daily RM Stock - GID 82202164)</label>
             <a href="https://docs.google.com/spreadsheets/d/1mmIHjG_BKIiV_02duivofXyJpWyM3T_h_Fq670m7eaU/edit?gid=82202164#gid=82202164" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">Open Sheet ↗</a>
           </div>
           <input type="text" id="cfg-sheet-stocks" value="https://docs.google.com/spreadsheets/d/1mmIHjG_BKIiV_02duivofXyJpWyM3T_h_Fq670m7eaU/edit?gid=82202164#gid=82202164" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono text-[11px]" readonly>
@@ -894,17 +910,27 @@
       return isNaN(parsed) ? 0.0 : parsed;
     }
 
-    // MAIN MRP CALCULATION ENGINE
+    // MAIN MRP CALCULATION ENGINE (WITH FG & WIP PRODUCTION STOCK NETTING)
+    // Formula: Balance Qty = Math.max(0, Order Qty - FG Stock Qty - WIP Stock Qty)
     function calculateMRP() {
       // 1. Filter Active Open Orders (CURRENT OPEN QTY > 0)
-      activeOpenOrders = rawOrders.filter(o => cleanNumber(o.openQty) > 0).map(o => ({
-        ...o,
-        partNo: normalizePartNo(o.partNo),
-        openQty: cleanNumber(o.openQty),
-        customer: (o.customer || '').trim(),
-        desc: (o.desc || '').trim(),
-        itemCode: (o.itemCode || '').trim()
-      }));
+      activeOpenOrders = rawOrders.filter(o => cleanNumber(o.openQty) > 0).map(o => {
+        const openQty = cleanNumber(o.openQty);
+        const fgStock = cleanNumber(o.fgStock);
+        const wipStock = cleanNumber(o.wipStock);
+        const balanceQty = Math.max(0, openQty - fgStock - wipStock);
+        return {
+          ...o,
+          partNo: normalizePartNo(o.partNo),
+          openQty,
+          fgStock,
+          wipStock,
+          balanceQty,
+          customer: (o.customer || '').trim(),
+          desc: (o.desc || '').trim(),
+          itemCode: (o.itemCode || '').trim()
+        };
+      });
 
       // 2. Build Daily Stocks Lookup Map
       const stockMap = new Map();
@@ -929,10 +955,14 @@
         let maxBuildableUnits = Infinity;
         const explodedLines = [];
 
+        // If balanceQty is 0, the order is completely satisfied by FG Stock + WIP Stock!
+        const isCoveredByStock = order.balanceQty === 0;
+
         fgComps.forEach(comp => {
           const rmNorm = normalizePartNo(comp.rmPart);
           const ratio = cleanNumber(comp.ratio) || 1.0;
-          const grossRequired = order.openQty * ratio;
+          // RM Demand is strictly driven by the remaining Balance Qty to produce
+          const grossRequired = order.balanceQty * ratio;
           const currentStock = stockMap.get(rmNorm) || 0.0;
           const rawDesc = comp.rmDesc || rmMetaMap.get(rmNorm)?.rmDesc || 'Raw Material';
           const isTIW = rawDesc.toUpperCase().includes('TIW') || 
@@ -945,7 +975,9 @@
 
           // Order-level coverage check
           let coverageStatus = 'FULL';
-          if (currentStock <= 0) {
+          if (isCoveredByStock) {
+            coverageStatus = 'COVERED_BY_STOCK';
+          } else if (currentStock <= 0) {
             coverageStatus = 'CRITICAL_ZERO';
             orderHasShortage = true;
           } else if (currentStock < grossRequired) {
@@ -953,7 +985,7 @@
             orderHasShortage = true;
           }
 
-          const canBuildWithThis = Math.floor(currentStock / ratio);
+          const canBuildWithThis = ratio > 0 ? Math.floor(currentStock / ratio) : 0;
           if (canBuildWithThis < maxBuildableUnits) {
             maxBuildableUnits = canBuildWithThis;
           }
@@ -973,46 +1005,62 @@
             canBuildWithThis
           });
 
-          // Aggregate Factory Consolidated Demand
-          if (!factoryDemandMap.has(rmNorm)) {
-            factoryDemandMap.set(rmNorm, {
-              rmPart: comp.rmPart,
-              rmNorm,
-              desc,
-              category: cat,
-              unit,
-              totalRequired: 0.0,
-              currentStock,
-              orders: []
+          // Aggregate Factory Consolidated Demand (Only for remaining unproduced balance)
+          if (grossRequired > 0) {
+            if (!factoryDemandMap.has(rmNorm)) {
+              factoryDemandMap.set(rmNorm, {
+                rmPart: comp.rmPart,
+                rmNorm,
+                desc,
+                category: cat,
+                unit,
+                totalRequired: 0.0,
+                currentStock,
+                orders: []
+              });
+            }
+            const rec = factoryDemandMap.get(rmNorm);
+            rec.totalRequired += grossRequired;
+            rec.orders.push({
+              fgPart: order.partNo,
+              customer: order.customer,
+              orderQty: order.openQty,
+              balanceQty: order.balanceQty,
+              grossRequired
             });
           }
-          const rec = factoryDemandMap.get(rmNorm);
-          rec.totalRequired += grossRequired;
-          rec.orders.push({
-            fgPart: order.partNo,
-            customer: order.customer,
-            orderQty: order.openQty,
-            grossRequired
-          });
         });
 
-        if (fgComps.length === 0) {
-          orderHasShortage = true;
-          maxBuildableUnits = 0;
+        if (isCoveredByStock) {
+          orderHasShortage = false;
+          maxBuildableUnits = order.openQty;
+          readyCount++;
+        } else {
+          if (fgComps.length === 0) {
+            orderHasShortage = true;
+            maxBuildableUnits = 0;
+          }
+          if (maxBuildableUnits === Infinity) maxBuildableUnits = 0;
+
+          if (orderHasShortage) blockedCount++;
+          else readyCount++;
         }
 
-        if (maxBuildableUnits === Infinity) maxBuildableUnits = 0;
-
-        if (orderHasShortage) blockedCount++;
-        else readyCount++;
+        let statusLabel = orderHasShortage ? 'Blocked by Shortage' : 'Ready to Produce';
+        let statusColor = orderHasShortage ? 'rose' : 'emerald';
+        if (isCoveredByStock) {
+          statusLabel = '100% Ready (Stock Covered)';
+          statusColor = 'emerald';
+        }
 
         orderAllocations.push({
           ...order,
           components: explodedLines,
           hasShortage: orderHasShortage,
+          isCoveredByStock,
           maxBuildableUnits,
-          statusLabel: orderHasShortage ? 'Blocked by Shortage' : 'Ready to Produce',
-          statusColor: orderHasShortage ? 'rose' : 'emerald'
+          statusLabel,
+          statusColor
         });
       });
 
@@ -1239,11 +1287,14 @@
       if (fgViewMode === 'TABLE') {
         const rows = filtered.map((order, idx) => {
           const isReady = !order.hasShortage;
+          const isCoveredByStock = order.isCoveredByStock;
           const shortComps = order.components.filter(c => c.deficit > 0);
           
           let bottleneckHtml = '';
-          if (isReady) {
-            bottleneckHtml = `<span class="inline-flex items-center gap-1 text-emerald-400 text-xs font-medium"><i data-lucide="check" class="w-3.5 h-3.5"></i> All ${order.components.length} BOM items stocked</span>`;
+          if (isCoveredByStock) {
+            bottleneckHtml = `<span class="inline-flex items-center gap-1 text-emerald-400 text-xs font-semibold"><i data-lucide="check-check" class="w-3.5 h-3.5"></i> Covered by FG (${order.fgStock}) + WIP (${order.wipStock})</span>`;
+          } else if (isReady) {
+            bottleneckHtml = `<span class="inline-flex items-center gap-1 text-emerald-400 text-xs font-medium"><i data-lucide="check" class="w-3.5 h-3.5"></i> All ${order.components.length} RM stocked for balance</span>`;
           } else {
             bottleneckHtml = `<div class="flex flex-wrap items-center gap-1">` + 
               shortComps.slice(0, 2).map(c => 
@@ -1255,13 +1306,20 @@
               `</div>`;
           }
 
-          const statusBadge = isReady
-            ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+          let statusBadge = '';
+          if (isCoveredByStock) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Stock Ready
+               </span>`;
+          } else if (isReady) {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Ready to Produce
-               </span>`
-            : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+               </span>`;
+          } else {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
                  <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> Blocked
                </span>`;
+          }
 
           return `
             <tr class="hover:bg-slate-800/40 transition ${isReady ? 'row-stocked' : 'row-shortage'}">
@@ -1274,10 +1332,19 @@
                 <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700/80">${order.customer || 'Customer'}</span>
               </td>
               <td class="py-2 px-3 text-xs text-slate-300">
-                <div class="truncate max-w-[220px]" title="${order.desc || ''}">${order.desc || 'Transformer / Inductor'}</div>
+                <div class="truncate max-w-[200px]" title="${order.desc || ''}">${order.desc || 'Transformer / Inductor'}</div>
               </td>
               <td class="py-2 px-3 text-right font-mono font-bold text-white text-xs">
                 ${order.openQty.toLocaleString()}
+              </td>
+              <td class="py-2 px-3 text-right font-mono text-emerald-400 text-xs">
+                ${order.fgStock > 0 ? order.fgStock.toLocaleString() : '<span class="text-slate-500">0</span>'}
+              </td>
+              <td class="py-2 px-3 text-right font-mono text-indigo-400 text-xs">
+                ${order.wipStock > 0 ? order.wipStock.toLocaleString() : '<span class="text-slate-500">0</span>'}
+              </td>
+              <td class="py-2 px-3 text-right font-mono font-bold text-amber-300 text-xs bg-slate-900/40">
+                ${order.balanceQty.toLocaleString()}
               </td>
               <td class="py-2 px-3 text-right font-mono font-bold text-xs">
                 ${isReady 
@@ -1306,7 +1373,7 @@
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span class="font-bold text-slate-200">📋 Compact Production Feasibility Register (${filtered.length} Orders)</span>
-                <span class="text-slate-400 hidden lg:inline">↔ Move left/right to view all columns</span>
+                <span class="text-slate-400 hidden lg:inline">| Formula: <strong>Balance Qty = Order Qty - FG Stock - WIP Stock</strong></span>
               </div>
               <div class="flex items-center gap-2">
                 <button onclick="scrollTableHorizontally('orders-table-scroll', -350)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
@@ -1319,18 +1386,21 @@
             </div>
 
             <div id="orders-table-scroll" class="scroll-container overflow-x-auto overflow-y-auto max-h-[620px]">
-              <table class="w-full text-left border-collapse text-xs min-w-[1300px] whitespace-nowrap">
+              <table class="w-full text-left border-collapse text-xs min-w-[1550px] whitespace-nowrap">
                 <thead class="bg-slate-900/95 backdrop-blur text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800 sticky top-0 z-30 text-[11px]">
                   <tr>
                     <th class="py-2.5 px-3 sticky-col-header min-w-[50px] text-center">#</th>
                     <th class="py-2.5 px-3 sticky-col-header min-w-[170px]" style="left: 50px;">FG Part Number (Fixed)</th>
-                    <th class="py-2.5 px-3 min-w-[130px]">Customer</th>
-                    <th class="py-2.5 px-3 min-w-[220px]">Description / Model</th>
-                    <th class="py-2.5 px-3 text-right min-w-[140px]">Open Order Demand</th>
-                    <th class="py-2.5 px-3 text-right min-w-[140px]">Max Units Buildable</th>
-                    <th class="py-2.5 px-3 text-center min-w-[170px]">Feasibility Status</th>
-                    <th class="py-2.5 px-3 min-w-[260px]">Shortage Bottleneck Material(s)</th>
-                    <th class="py-2.5 px-3 text-center min-w-[130px]">BOM Action</th>
+                    <th class="py-2.5 px-3 min-w-[120px]">Customer</th>
+                    <th class="py-2.5 px-3 min-w-[200px]">Description / Model</th>
+                    <th class="py-2.5 px-3 text-right min-w-[120px]">Order Qty</th>
+                    <th class="py-2.5 px-3 text-right min-w-[110px] text-emerald-400">FG Stock</th>
+                    <th class="py-2.5 px-3 text-right min-w-[110px] text-indigo-400">WIP Stock</th>
+                    <th class="py-2.5 px-3 text-right min-w-[130px] text-amber-300 bg-slate-950/60 font-bold">Balance Qty (Net)</th>
+                    <th class="py-2.5 px-3 text-right min-w-[130px]">Max Units Buildable</th>
+                    <th class="py-2.5 px-3 text-center min-w-[160px]">Feasibility Status</th>
+                    <th class="py-2.5 px-3 min-w-[260px]">Shortage Bottleneck / Netting Status</th>
+                    <th class="py-2.5 px-3 text-center min-w-[120px]">BOM Action</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60 font-medium">
@@ -1342,7 +1412,7 @@
             <div class="p-3 bg-slate-900/60 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400 px-4">
               <div>Showing ${filtered.length} customer finished goods orders</div>
               <div class="flex items-center gap-4">
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 100% Feasible (All RM in stock)</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 100% Feasible (All RM or FG Stock Available)</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Blocked by Material Shortage</span>
               </div>
             </div>
@@ -1355,17 +1425,27 @@
       // OPTION B: DETAILED ACCORDION BOM CARDS VIEW
       container.innerHTML = filtered.map((order, idx) => {
         const isReady = !order.hasShortage;
-        const statusBadge = isReady
-          ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-               <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Ready to Produce (100% RM Available)
-             </span>`
-          : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+        const isCoveredByStock = order.isCoveredByStock;
+        let statusBadge = '';
+        if (isCoveredByStock) {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+               <i data-lucide="check-check" class="w-3.5 h-3.5"></i> 100% Covered by Stock (FG: ${order.fgStock} + WIP: ${order.wipStock})
+             </span>`;
+        } else if (isReady) {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+               <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Ready to Produce (100% RM Available for Balance ${order.balanceQty.toLocaleString()})
+             </span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
                <i data-lucide="alert-octagon" class="w-3.5 h-3.5"></i> Blocked by Shortage (Max ${order.maxBuildableUnits.toLocaleString()} units)
              </span>`;
+        }
 
         const rowsHtml = order.components.map(comp => {
           let lineBadge = '';
-          if (comp.coverageStatus === 'FULL') {
+          if (comp.coverageStatus === 'COVERED_BY_STOCK') {
+            lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✓ Stock Net</span>`;
+          } else if (comp.coverageStatus === 'FULL') {
             lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">✓ Sufficient</span>`;
           } else if (comp.coverageStatus === 'PARTIAL') {
             lineBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">⚠️ Partial</span>`;

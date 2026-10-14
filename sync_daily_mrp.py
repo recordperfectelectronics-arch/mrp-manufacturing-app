@@ -20,9 +20,12 @@ app_dir = r"C:\Users\lenovo\Desktop\AppSheet_Manufacturing_App"
 
 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting Daily MRP & Stocks Live Sync with D-Series & I-Series Dual Tracking...")
 
-# 1. Fetch Open Orders from OPEN ORDER UPDATE FILE 2025 (GID 0)
-url_orders = 'https://docs.google.com/spreadsheets/d/1Ek0rpo9sUDsStSo0pm1EF6oR3gCMmjvTa2TS-i8CzA0/export?format=csv&gid=0'
-print("1/4 Fetching live Open Orders (Col AE)...")
+# 1. Fetch Open Orders from open order FG(14.10.2026) (GID 0)
+url_orders = 'https://docs.google.com/spreadsheets/d/1-bVdXQ7eDiRF3876wHDdaD94kbVRII7Mq3DU37e4EGg/export?format=csv&gid=0'
+url_fg_stock = 'https://docs.google.com/spreadsheets/d/1F7a15XQvWvRBjFOWRO2-gSiMfj3vw16c0FWUW28XCa4/export?format=csv&gid=0'
+url_wip_stock = 'https://docs.google.com/spreadsheets/d/112padFLp9mRsSuN39Xy3umFOsjUmSOMvHPtnyIauNik/export?format=csv&gid=0'
+
+print("1/4 Fetching live Open Orders & Stock files...")
 try:
     lines = urllib.request.urlopen(url_orders, timeout=15).read().decode('utf-8', errors='ignore').splitlines()
     order_reader = list(csv.reader(lines))

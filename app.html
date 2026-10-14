@@ -723,12 +723,13 @@
       const stockMap = {};
       rmInventory.forEach(r => { stockMap[r.rmPart] = Number(r.stock || 0); });
 
-      // FG Netting
+      // FG Netting (Balance Qty = Order Qty - FG Stock - WIP Stock)
       fgParts.forEach(fg => {
         const openQ = Number(fg.openQty || 0);
+        const fgS = Number(fg.fgStock || 0);
+        const wipS = Number(fg.wipStock || 0);
         totalOpenDemand += openQ;
-        // Direct Open Order Demand (FG stock is currently not updated)
-        const netProduction = openQ;
+        const netProduction = Math.max(0, openQ - fgS - wipS);
         fg.netProduction = netProduction;
         totalNetRequiredFG += netProduction;
         netProductionByPart[fg.partNo] = (netProductionByPart[fg.partNo] || 0) + netProduction;
