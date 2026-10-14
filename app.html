@@ -378,9 +378,12 @@
                 <th>Customer</th>
                 <th>Item Code</th>
                 <th>Description / Model</th>
-                <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13.5px;">Demand Qty (Col AE)</th>
-                <th style="text-align: right; font-weight: 800; font-size: 13.5px;">Can Build (Units)</th>
-                <th>Production Feasibility Status</th>
+                <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13px;">Open Order Qty</th>
+                <th style="text-align: right; background: #ecfdf5; color: #047857; font-weight: 700; font-size: 12.5px;">Daily FG Stock</th>
+                <th style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 12.5px;">Daily WIP Stock</th>
+                <th style="text-align: right; background: #fefce8; color: #854d0e; font-weight: 800; font-size: 13px;">Actual Open FG Qty (Material Check)</th>
+                <th style="text-align: right; font-weight: 800; font-size: 13px;">Can Build</th>
+                <th>Feasibility Status</th>
                 <th style="min-width: 320px;">Shortage Raw Materials Details (BOM Code / Available / Deficit)</th>
                 <th>Action</th>
               </tr>
@@ -1036,8 +1039,11 @@
             <td><span style="font-weight: 600; color: #334155;">${fg.customer || '-'}</span></td>
             <td><code style="font-weight: 700; color: #0284c7; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${fg.itemCode || '-'}</code></td>
             <td><span style="color: #475569; font-size: 12px;">${fg.desc || '-'}</span></td>
-            <td style="text-align: right; background: #f0fdf4; font-weight: 800; color: #166534; font-size: 13.5px;">${Math.round(fg.openQty).toLocaleString()}</td>
-            <td style="text-align: right; font-weight: 800; color: ${fg.hasShortage ? '#b91c1c' : '#15803d'}; font-size: 13.5px;">${fg.maxBuildable.toLocaleString()}</td>
+            <td style="text-align: right; background: #f0fdf4; font-weight: 800; color: #166534; font-size: 13px;">${Math.round(fg.openQty).toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 600; color: #047857; font-size: 12.5px;">${fg.fgStock > 0 ? Math.round(fg.fgStock).toLocaleString() : '<span style="color:#94a3b8;">0</span>'}</td>
+            <td style="text-align: right; font-weight: 600; color: #1d4ed8; font-size: 12.5px;">${fg.wipStock > 0 ? Math.round(fg.wipStock).toLocaleString() : '<span style="color:#94a3b8;">0</span>'}</td>
+            <td style="text-align: right; background: #fefce8; font-weight: 800; color: #854d0e; font-size: 13px;">${Math.round(fg.netProduction).toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 800; color: ${fg.hasShortage ? '#b91c1c' : '#15803d'}; font-size: 13px;">${fg.maxBuildable.toLocaleString()}</td>
             <td>${statusBadge}</td>
             <td>${shortageBadges}</td>
             <td>
@@ -1096,15 +1102,20 @@
       }
 
       titleEl.innerText = `${fg.partNo} — ${fg.customer || ''} [Item Code: ${fg.itemCode || ''}]`;
-      descEl.innerText = `${fg.desc || ''} | Production Demand (Col AE): ${Math.round(fg.openQty).toLocaleString()} units`;
+      descEl.innerHTML = `<span><strong>Open Qty:</strong> ${Math.round(fg.openQty).toLocaleString()} units</span> | 
+        <span style="color: #047857;"><strong>Daily FG Stock:</strong> ${Math.round(fg.fgStock).toLocaleString()}</span> | 
+        <span style="color: #1d4ed8;"><strong>Daily WIP Stock:</strong> ${Math.round(fg.wipStock).toLocaleString()}</span> ➔ 
+        <span style="background: #fefce8; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-weight: 800;"><strong>Actual Open FG Qty (Material Check):</strong> ${Math.round(fg.netProduction).toLocaleString()} units</span>`;
 
       let cardBadge = '';
       if (!fg.openQty || fg.openQty <= 0) {
         cardBadge = `<div class="badge" style="font-size: 13px; padding: 6px 12px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700;">⚪ No Active Production Order (Open Demand = 0)</div>`;
+      } else if (fg.netProduction <= 0) {
+        cardBadge = `<div class="badge" style="font-size: 13px; padding: 6px 12px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700;">🟢 100% Stock Ready: Order is Fully Covered by Daily FG Stock (${fg.fgStock}) + Daily WIP Stock (${fg.wipStock})</div>`;
       } else if (fg.hasShortage) {
-        cardBadge = `<div class="badge badge-red" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🔴 Deficit Shortage (Can only build ${fg.maxBuildable.toLocaleString()} of ${fg.netProduction.toLocaleString()} Units)</div>`;
+        cardBadge = `<div class="badge badge-red" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🔴 Deficit Shortage (Can only build ${fg.maxBuildable.toLocaleString()} of remaining ${fg.netProduction.toLocaleString()} Units)</div>`;
       } else {
-        cardBadge = `<div class="badge badge-green" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🟢 Production Feasible: All Raw Materials in Stock (Ready to Build Full Demand: ${fg.netProduction.toLocaleString()} Units)</div>`;
+        cardBadge = `<div class="badge badge-green" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">🟢 Production Feasible: All Raw Materials in Stock (Ready to Build Remaining Demand: ${fg.netProduction.toLocaleString()} Units)</div>`;
       }
 
       statsEl.innerHTML = cardBadge;
