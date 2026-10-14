@@ -276,21 +276,30 @@ function runMRPCalculation() {
     var fgSS = SpreadsheetApp.openById(SPREADSHEETS.FG_STOCKS.id);
     var fgSheet = getSheetByGid(fgSS, SPREADSHEETS.FG_STOCKS.gid);
     var fgData = fgSheet.getDataRange().getValues();
-    var colMapFG = { partNo: 0, qty: 1 };
+    var colMapFG = { partNo: -1, tallyPart: -1, qty: -1 };
+    
+    // Scan headers in first 3 rows
     for (var fgr = 0; fgr < Math.min(3, fgData.length); fgr++) {
       for (var fgc = 0; fgc < fgData[fgr].length; fgc++) {
         var fgh = String(fgData[fgr][fgc]).trim().toUpperCase();
-        if (fgh.indexOf("PART") !== -1 || fgh.indexOf("ITEM") !== -1 || fgh.indexOf("TALLY") !== -1) colMapFG.partNo = fgc;
+        if (fgh.indexOf("TALLY") !== -1) colMapFG.tallyPart = fgc;
+        else if (fgh.indexOf("PART") !== -1 || fgh.indexOf("ITEM") !== -1 || fgh.indexOf("CODE") !== -1) {
+          if (colMapFG.partNo === -1) colMapFG.partNo = fgc;
+        }
         if (fgh.indexOf("QTY") !== -1 || fgh.indexOf("STOCK") !== -1 || fgh.indexOf("BALANCE") !== -1 || fgh.indexOf("CLOSING") !== -1) colMapFG.qty = fgc;
       }
     }
+    if (colMapFG.partNo === -1) colMapFG.partNo = 0;
+    if (colMapFG.qty === -1) colMapFG.qty = 1;
+
     for (var fi = 1; fi < fgData.length; fi++) {
       var fRow = fgData[fi];
-      var fPart = normalizePartNo(fRow[colMapFG.partNo] || fRow[0]);
-      if (fPart) {
-        var fQty = cleanNumber(fRow[colMapFG.qty] || fRow[1]);
-        fgStockMap[fPart] = (fgStockMap[fPart] || 0.0) + fQty;
-      }
+      var fPart = normalizePartNo(fRow[colMapFG.partNo]);
+      var fTally = colMapFG.tallyPart !== -1 ? normalizePartNo(fRow[colMapFG.tallyPart]) : '';
+      var fQty = cleanNumber(fRow[colMapFG.qty]);
+
+      if (fPart) fgStockMap[fPart] = (fgStockMap[fPart] || 0.0) + fQty;
+      if (fTally && fTally !== fPart) fgStockMap[fTally] = (fgStockMap[fTally] || 0.0) + fQty;
     }
   } catch (errFG) {
     Logger.log("Notice: Error reading FG Stock sheet: " + errFG.toString());
@@ -302,28 +311,37 @@ function runMRPCalculation() {
     var wipSS = SpreadsheetApp.openById(SPREADSHEETS.WIP_STOCKS.id);
     var wipSheet = getSheetByGid(wipSS, SPREADSHEETS.WIP_STOCKS.gid);
     var wipData = wipSheet.getDataRange().getValues();
-    var colMapWIP = { partNo: 0, qty: 1 };
+    var colMapWIP = { partNo: -1, tallyPart: -1, qty: -1 };
+    
+    // Scan headers in first 3 rows
     for (var wr = 0; wr < Math.min(3, wipData.length); wr++) {
       for (var wc = 0; wc < wipData[wr].length; wc++) {
         var wh = String(wipData[wr][wc]).trim().toUpperCase();
-        if (wh.indexOf("PART") !== -1 || wh.indexOf("ITEM") !== -1 || wh.indexOf("TALLY") !== -1) colMapWIP.partNo = wc;
+        if (wh.indexOf("TALLY") !== -1) colMapWIP.tallyPart = wc;
+        else if (wh.indexOf("PART") !== -1 || wh.indexOf("ITEM") !== -1 || wh.indexOf("CODE") !== -1) {
+          if (colMapWIP.partNo === -1) colMapWIP.partNo = wc;
+        }
         if (wh.indexOf("QTY") !== -1 || wh.indexOf("STOCK") !== -1 || wh.indexOf("WIP") !== -1 || wh.indexOf("BALANCE") !== -1) colMapWIP.qty = wc;
       }
     }
+    if (colMapWIP.partNo === -1) colMapWIP.partNo = 0;
+    if (colMapWIP.qty === -1) colMapWIP.qty = 1;
+
     for (var wi = 1; wi < wipData.length; wi++) {
       var wRow = wipData[wi];
-      var wPart = normalizePartNo(wRow[colMapWIP.partNo] || wRow[0]);
-      if (wPart) {
-        var wQty = cleanNumber(wRow[colMapWIP.qty] || wRow[1]);
-        wipStockMap[wPart] = (wipStockMap[wPart] || 0.0) + wQty;
-      }
+      var wPart = normalizePartNo(wRow[colMapWIP.partNo]);
+      var wTally = colMapWIP.tallyPart !== -1 ? normalizePartNo(wRow[colMapWIP.tallyPart]) : '';
+      var wQty = cleanNumber(wRow[colMapWIP.qty]);
+
+      if (wPart) wipStockMap[wPart] = (wipStockMap[wPart] || 0.0) + wQty;
+      if (wTally && wTally !== wPart) wipStockMap[wTally] = (wipStockMap[wTally] || 0.0) + wQty;
     }
   } catch (errWIP) {
     Logger.log("Notice: Error reading WIP Stock sheet: " + errWIP.toString());
   }
 
-  // 6. COMPUTATIONAL SHORTAGE ENGINE (WITH PRODUCTION STOCK NETTING)
-  // Formula: Balance Qty = Math.max(0, Order Qty - FG Stock Qty - WIP Stock Qty)
+  // 6. COMPUTATIONAL SHORTAGE ENGINE (WITH DUAL PART NO & TALLY PART NO STOCK NETTING)
+  // Formula: Actual Open Order FG Qty = Math.max(0, Open Qty - (Daily FG Stock + Daily WIP Stock))
   var factoryDemand = {};
   var orderAllocations = [];
   var readyOrdersCount = 0;
@@ -332,9 +350,13 @@ function runMRPCalculation() {
 
   for (var oi = 0; oi < activeOrders.length; oi++) {
     var ord = activeOrders[oi];
-    var fgStock = fgStockMap[ord.partNo] || 0.0;
-    var wipStock = wipStockMap[ord.partNo] || 0.0;
-    var balanceQty = Math.max(0, ord.openQty - fgStock - wipStock);
+    var normP = ord.partNo;
+    var normItem = normalizePartNo(ord.itemCode);
+
+    // Dual match on both Part No and Tally Part No / Item Code
+    var fgStock = fgStockMap[normP] !== undefined ? fgStockMap[normP] : (normItem && fgStockMap[normItem] !== undefined ? fgStockMap[normItem] : 0.0);
+    var wipStock = wipStockMap[normP] !== undefined ? wipStockMap[normP] : (normItem && wipStockMap[normItem] !== undefined ? wipStockMap[normItem] : 0.0);
+    var balanceQty = Math.max(0, ord.openQty - (fgStock + wipStock));
     totalBalanceQty += balanceQty;
 
     var orderComps = [];

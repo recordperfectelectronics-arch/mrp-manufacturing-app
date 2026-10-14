@@ -870,10 +870,10 @@
   </div>
 
   <!-- Pre-Loaded Datasets (Zero latency on page load) -->
-  <script src="open_orders_data.js?v=20261014_1608"></script>
-  <script src="bom_data.js?v=20261014_1608"></script>
-  <script src="rm_data.js?v=20261014_1608"></script>
-  <script src="sync_status.js?v=20261014_1608"></script>
+  <script src="open_orders_data.js?v=20261014_1625"></script>
+  <script src="bom_data.js?v=20261014_1625"></script>
+  <script src="rm_data.js?v=20261014_1625"></script>
+  <script src="sync_status.js?v=20261014_1625"></script>
 
   <!-- CORE MRP COMPUTATIONAL ENGINE & UI SCRIPT -->
   <script>
@@ -910,18 +910,46 @@
       return isNaN(parsed) ? 0.0 : parsed;
     }
 
-    // MAIN MRP CALCULATION ENGINE (WITH FG & WIP PRODUCTION STOCK NETTING)
-    // Formula: Balance Qty = Math.max(0, Order Qty - FG Stock Qty - WIP Stock Qty)
+    // Saved FG & WIP Stocks State
+    let localFGStockMap = JSON.parse(localStorage.getItem("INVENMRP_FG_STOCKS")) || {};
+    let localWIPStockMap = JSON.parse(localStorage.getItem("INVENMRP_WIP_STOCKS")) || {};
+
+    function updateOrderFGStock(partNo, val) {
+      const num = cleanNumber(val);
+      localFGStockMap[normalizePartNo(partNo)] = num;
+      localStorage.setItem("INVENMRP_FG_STOCKS", JSON.stringify(localFGStockMap));
+      calculateMRP();
+    }
+
+    function updateOrderWIPStock(partNo, val) {
+      const num = cleanNumber(val);
+      localWIPStockMap[normalizePartNo(partNo)] = num;
+      localStorage.setItem("INVENMRP_WIP_STOCKS", JSON.stringify(localWIPStockMap));
+      calculateMRP();
+    }
+
+    // MAIN MRP CALCULATION ENGINE (WITH DUAL PART NO & TALLY PART NO STOCK NETTING)
+    // Formula: Actual Open Order FG Qty = Math.max(0, Open Qty - (Daily FG Stock + Daily WIP Stock))
     function calculateMRP() {
       // 1. Filter Active Open Orders (CURRENT OPEN QTY > 0)
       activeOpenOrders = rawOrders.filter(o => cleanNumber(o.openQty) > 0).map(o => {
+        const normP = normalizePartNo(o.partNo);
+        const normItem = normalizePartNo(o.itemCode);
         const openQty = cleanNumber(o.openQty);
-        const fgStock = cleanNumber(o.fgStock);
-        const wipStock = cleanNumber(o.wipStock);
-        const balanceQty = Math.max(0, openQty - fgStock - wipStock);
+
+        // Match on both Part No and Tally Part No / Item Code (Live Sheet + Local Overrides)
+        let fgStock = cleanNumber(o.fgStock);
+        if (localFGStockMap[normP] !== undefined) fgStock = localFGStockMap[normP];
+        else if (normItem && localFGStockMap[normItem] !== undefined) fgStock = localFGStockMap[normItem];
+
+        let wipStock = cleanNumber(o.wipStock);
+        if (localWIPStockMap[normP] !== undefined) wipStock = localWIPStockMap[normP];
+        else if (normItem && localWIPStockMap[normItem] !== undefined) wipStock = localWIPStockMap[normItem];
+
+        const balanceQty = Math.max(0, openQty - (fgStock + wipStock));
         return {
           ...o,
-          partNo: normalizePartNo(o.partNo),
+          partNo: normP,
           openQty,
           fgStock,
           wipStock,
@@ -1337,13 +1365,19 @@
               <td class="py-2 px-3 text-right font-mono font-bold text-white text-xs">
                 ${order.openQty.toLocaleString()}
               </td>
-              <td class="py-2 px-3 text-right font-mono text-emerald-400 text-xs">
-                ${order.fgStock > 0 ? order.fgStock.toLocaleString() : '<span class="text-slate-500">0</span>'}
+              <td class="py-1.5 px-2 text-right font-mono text-xs">
+                <input type="number" min="0" value="${order.fgStock || 0}" 
+                  onchange="updateOrderFGStock('${order.partNo}', this.value)" 
+                  class="w-20 px-2 py-1 text-right bg-slate-900 border border-emerald-900/60 hover:border-emerald-500/80 focus:border-emerald-400 focus:outline-none rounded text-emerald-400 font-bold font-mono text-xs transition" 
+                  title="Daily FG Stock (Edit to update netting immediately)">
               </td>
-              <td class="py-2 px-3 text-right font-mono text-indigo-400 text-xs">
-                ${order.wipStock > 0 ? order.wipStock.toLocaleString() : '<span class="text-slate-500">0</span>'}
+              <td class="py-1.5 px-2 text-right font-mono text-xs">
+                <input type="number" min="0" value="${order.wipStock || 0}" 
+                  onchange="updateOrderWIPStock('${order.partNo}', this.value)" 
+                  class="w-20 px-2 py-1 text-right bg-slate-900 border border-indigo-900/60 hover:border-indigo-500/80 focus:border-indigo-400 focus:outline-none rounded text-indigo-400 font-bold font-mono text-xs transition" 
+                  title="Daily WIP Stock (Edit to update netting immediately)">
               </td>
-              <td class="py-2 px-3 text-right font-mono font-bold text-amber-300 text-xs bg-slate-900/40">
+              <td class="py-2 px-3 text-right font-mono font-black text-amber-300 text-xs bg-slate-950/70 border-x border-slate-800">
                 ${order.balanceQty.toLocaleString()}
               </td>
               <td class="py-2 px-3 text-right font-mono font-bold text-xs">
@@ -2132,8 +2166,19 @@
         const data = await res.json();
         if (data.success) {
           if (data.timestamp) document.getElementById('sync-time').innerText = data.timestamp;
+          if (data.orderAllocations && data.orderAllocations.length > 0) {
+            rawOrders = data.orderAllocations.map(o => ({
+              partNo: o.partNo,
+              customer: o.customer,
+              itemCode: o.itemCode,
+              desc: o.desc,
+              openQty: o.openQty,
+              fgStock: o.fgStock,
+              wipStock: o.wipStock
+            }));
+          }
           calculateMRP();
-          alert("✅ Live Synced from Google Sheets successfully!");
+          alert("✅ Live Synced from all 5 Google Sheets successfully!\nMatched Daily FG Stock & Daily WIP Stock across Part No & Tally Part No.");
           closeDataModal();
         } else {
           alert("Apps Script error: " + (data.message || "Unknown error"));
