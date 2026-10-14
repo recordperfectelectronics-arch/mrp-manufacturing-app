@@ -316,10 +316,13 @@
               <th>Customer Name</th>
               <th>Item Code</th>
               <th>Description / Model</th>
-              <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13.5px;">Current Open Order Qty (Col AE)</th>
-              <th style="text-align: right; background: #f8fafc; font-weight: 800; font-size: 13.5px;">Max Units Buildable</th>
-              <th>Production Feasibility Status</th>
-              <th>Shortage Component Alert / Bottleneck</th>
+              <th style="text-align: right; background: #f0fdf4; color: #166534; font-weight: 800; font-size: 13px;">Order Qty</th>
+              <th style="text-align: right; background: #ecfdf5; color: #047857; font-weight: 700; font-size: 12.5px;">FG Stock</th>
+              <th style="text-align: right; background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 12.5px;">WIP Stock</th>
+              <th style="text-align: right; background: #fefce8; color: #854d0e; font-weight: 800; font-size: 13px;">Balance Qty (Net)</th>
+              <th style="text-align: right; background: #f8fafc; font-weight: 800; font-size: 13px;">Max Buildable</th>
+              <th>Feasibility Status</th>
+              <th>Netting / Bottleneck Alert</th>
             </tr>
           </thead>
           <tbody id="fg-table-body"></tbody>
@@ -895,22 +898,27 @@
       tbody.innerHTML = filtered.map(item => {
         let feasBadge = '';
         let bneckStr = '';
-        if (item.netProduction <= 0) {
-          feasBadge = `<span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700;">⚪ No Production Order (0 Qty)</span>`;
+        const isCoveredByStock = item.openQty > 0 && item.netProduction <= 0;
+
+        if (isCoveredByStock) {
+          feasBadge = `<span class="badge" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700;">🟢 100% Stock Ready</span>`;
+          bneckStr = `<span style="color: #059669; font-size: 11.5px; font-weight: 600;">✓ Covered by FG (${item.fgStock}) + WIP (${item.wipStock})</span>`;
+        } else if (item.openQty <= 0) {
+          feasBadge = `<span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700;">⚪ No Demand (0 Qty)</span>`;
           bneckStr = `<span style="color: #94a3b8; font-size: 11.5px;">— No Active Order</span>`;
         } else if (item.noBOM) {
           feasBadge = `<span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 700;">⚠️ No BOM in Master Sheet</span>`;
           bneckStr = `<span style="color: #b45309; font-size: 11.5px;">Check BOM (19.03.2026)</span>`;
         } else if (item.hasShortage) {
-          feasBadge = `<span class="badge badge-red" style="font-weight: 700;">🔴 Material Shortage (Max ${item.maxBuildable.toLocaleString()})</span>`;
+          feasBadge = `<span class="badge badge-red" style="font-weight: 700;">🔴 Shortage (Max ${item.maxBuildable.toLocaleString()})</span>`;
           if (item.shortages && item.shortages.length > 0) {
             bneckStr = `<span style="cursor: pointer; color: #b91c1c; font-weight: 700;" onclick="switchToPartDeepDive('${item.partNo}')">🔴 ${item.shortages.length} Shortage(s): <u>${item.bottleneck ? item.bottleneck.rmPart : item.shortages[0].rmPart}</u> ➔</span>`;
           } else {
             bneckStr = `<span style="color: #b91c1c; font-size: 11px;">⚠️ Deficit Shortage</span>`;
           }
         } else {
-          feasBadge = `<span class="badge badge-green" style="font-weight: 700;">🟢 Production Feasible (RM 100% in Stock)</span>`;
-          bneckStr = `<span style="color: #15803d; font-size: 11.5px; font-weight: 600;">✓ All Required RM Available in Stores</span>`;
+          feasBadge = `<span class="badge badge-green" style="font-weight: 700;">🟢 Ready to Produce</span>`;
+          bneckStr = `<span style="color: #15803d; font-size: 11.5px; font-weight: 600;">✓ RM 100% Available for Balance ${item.netProduction.toLocaleString()}</span>`;
         }
 
         return `
@@ -919,10 +927,19 @@
             <td><span style="font-weight: 600; color: #334155;">${item.customer || '-'}</span></td>
             <td><code style="font-weight: 700; color: #0284c7; background: #f0f9ff; padding: 2px 5px; border-radius: 4px;">${item.itemCode || '-'}</code></td>
             <td><span style="color: #64748b; font-size: 12px;">${item.desc || '-'}</span></td>
-            <td style="text-align: right; font-weight: 800; font-size: 14px; background: #f0fdf4; color: #166534;">
+            <td style="text-align: right; font-weight: 800; font-size: 13px; background: #f0fdf4; color: #166534;">
               ${Math.round(item.openQty).toLocaleString()}
             </td>
-            <td style="text-align: right; font-weight: 800; font-size: 14px; color: ${item.hasShortage ? '#b91c1c' : '#15803d'};">
+            <td style="text-align: right; font-weight: 600; font-size: 12.5px; color: #047857;">
+              ${item.fgStock > 0 ? Math.round(item.fgStock).toLocaleString() : '<span style="color:#94a3b8;">0</span>'}
+            </td>
+            <td style="text-align: right; font-weight: 600; font-size: 12.5px; color: #1d4ed8;">
+              ${item.wipStock > 0 ? Math.round(item.wipStock).toLocaleString() : '<span style="color:#94a3b8;">0</span>'}
+            </td>
+            <td style="text-align: right; font-weight: 800; font-size: 13px; background: #fefce8; color: #854d0e;">
+              ${Math.round(item.netProduction).toLocaleString()}
+            </td>
+            <td style="text-align: right; font-weight: 800; font-size: 13px; color: ${item.hasShortage ? '#b91c1c' : '#15803d'};">
               ${Math.round(item.maxBuildable).toLocaleString()}
             </td>
             <td>${feasBadge}</td>
